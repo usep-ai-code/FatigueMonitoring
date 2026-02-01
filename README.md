@@ -1,1 +1,272 @@
-# FatigueMonitoring
+# Fatigue Monitoring Dashboard
+
+A real-time fatigue monitoring dashboard for mining and hauling operations. This application monitors driver fatigue alerts, tracks follow-up status, and provides insights into high-risk units and areas.
+
+## 🏗️ Architecture
+
+### Stack
+
+**Backend:**
+- ASP.NET Core (.NET 9)
+- Entity Framework Core
+- SQL Server
+- Server-Sent Events (SSE)
+- Background Jobs for data aggregation
+
+**Frontend:**
+- React 19
+- Vite
+- Tailwind CSS
+- Real-time SSE updates
+
+### Data Flow
+
+```
+External API (TransTrack)
+    ↓ (Background Job - every 5 minutes)
+Raw Data Tables
+    ↓ (Background Job - aggregation)
+AI_ Aggregation Tables (_T suffix)
+    ↓ (SSE Endpoint)
+React Dashboard (Real-time updates)
+```
+
+## 📊 Features
+
+### Real-Time Monitoring
+- **SSE Connection**: Live updates every 3 seconds with automatic reconnection
+- **Connection Status Indicator**: Visual feedback (Connected/Connecting/Disconnected)
+- **Heartbeat Mechanism**: Keeps connection alive with 15-second intervals
+
+### Dashboard Components
+
+1. **KPI Cards**
+   - Total Alarms (All/Mining/Hauling)
+   - Followed Up count
+   - Waiting Follow Up count
+
+2. **Active Alerts**
+   - Real-time list of open fatigue alerts
+   - Unit details, operator name, location
+   - Open duration tracking
+   - Click to view detailed modal
+
+3. **Area Distribution**
+   - Alert distribution by location
+   - Separate views for Mining and Hauling
+   - Click to filter alerts by location
+
+4. **Delayed Follow-Up**
+   - Alerts open for more than 30 minutes
+   - Priority visual indicators
+
+5. **Strategic Insights**
+   - Recurrent Units: Operators with multiple events
+   - High Risk Areas: Locations with frequent alerts
+
+### User Interface Features
+- Dark/Light mode toggle
+- Dynamic pagination based on available screen space
+- Responsive layout
+- Real-time notifications for new alerts
+- Global area filter (All/Mining/Hauling)
+
+## 🗄️ Database Schema
+
+### Raw Data Tables
+- `RawEvents`: Raw event data from external API
+- `RawFollowUps`: Follow-up information for events
+
+### Aggregation Tables (AI_*_T prefix/suffix)
+- `AI_DashboardStats_T`: KPI statistics by area
+- `AI_ActiveAlert_T`: Currently open alerts
+- `AI_AreaDistribution_T`: Alert counts by location
+- `AI_RecurrentUnit_T`: Units with multiple events
+- `AI_HighRiskArea_T`: High-frequency alert locations
+
+## 🚀 Setup Instructions
+
+### Prerequisites
+- .NET 9 SDK
+- Node.js 18+ and npm
+- SQL Server database
+- Access to TransTrack External API
+
+### Backend Setup
+
+1. **Navigate to API project:**
+   ```bash
+   cd FatigueMonitoring.Web.Api
+   ```
+
+2. **Update connection string in `appsettings.json`:**
+   ```json
+   {
+     "ConnectionStrings": {
+       "DefaultConnection": "Server=your-server;Database=your-db;User Id=your-user;Password=your-password"
+     },
+     "ExternalApi": {
+       "Username": "sis@mdvr",
+       "Password": "Sis@mdvr12345"
+     }
+   }
+   ```
+
+3. **Run migrations:**
+   ```bash
+   dotnet ef database update
+   ```
+
+4. **Run the API:**
+   ```bash
+   dotnet run
+   ```
+
+   The API will start on `http://localhost:5000`
+
+### Frontend Setup
+
+1. **Navigate to React project:**
+   ```bash
+   cd fatigue-monitoring.react
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Update environment variables in `.env`:**
+   ```
+   VITE_API_URL=http://localhost:5000
+   ```
+
+4. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+   The frontend will start on `http://localhost:5173`
+
+## 🔧 Configuration
+
+### External API Rate Limiting
+The application respects the TransTrack API rate limit of 1 login request per minute. The `ExternalApiService` automatically manages token refresh and rate limiting.
+
+### Background Job Schedule
+The background aggregation job runs every 5 minutes. To adjust:
+```csharp
+// In BackgroundAggregationJob.cs
+private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
+```
+
+### SSE Update Frequency
+SSE checks for updates every 3 seconds. To adjust:
+```csharp
+// In SseController.cs
+await Task.Delay(3000, HttpContext.RequestAborted);
+```
+
+## 📡 API Endpoints
+
+### REST API
+- `GET /api/dashboard/stats?area={area}` - Get KPI statistics
+- `GET /api/dashboard/active-alerts?area={area}&location={location}` - Get active alerts
+- `GET /api/dashboard/area-distribution?area={area}` - Get area distribution
+- `GET /api/dashboard/recurrent-units?area={area}` - Get recurrent units
+- `GET /api/dashboard/high-risk-areas?area={area}` - Get high-risk areas
+- `GET /api/dashboard/delayed-alerts?area={area}` - Get delayed alerts (>30 min)
+
+### SSE Endpoint
+- `GET /api/sse/stream` - Server-Sent Events stream
+
+## 🌐 Deployment to Azure App Service
+
+### Backend Deployment
+
+1. **Publish the API:**
+   ```bash
+   cd FatigueMonitoring.Web.Api
+   dotnet publish -c Release -o ./publish
+   ```
+
+2. **Deploy to Azure App Service:**
+   - Create an Azure App Service (ASP.NET Core)
+   - Deploy the `publish` folder
+   - Update connection string in Azure Portal > Configuration
+
+### Frontend Deployment
+
+1. **Build the React app:**
+   ```bash
+   cd fatigue-monitoring.react
+   npm run build
+   ```
+
+2. **Update `.env.production`:**
+   ```
+   VITE_API_URL=https://your-api-name.azurewebsites.net
+   ```
+
+3. **Deploy to Azure Static Web Apps or App Service:**
+   - Deploy the `dist` folder
+   - Configure SPA routing if needed
+
+## 🔐 Security Considerations
+
+1. **Connection Strings**: Store sensitive data in Azure Key Vault or App Service Configuration
+2. **CORS**: Configure CORS properly for production
+3. **API Authentication**: Consider adding authentication for the dashboard API
+4. **External API Credentials**: Secure the TransTrack API credentials
+
+## 📝 Development Notes
+
+### Primary Constructors
+The backend uses C# primary constructors for dependency injection:
+```csharp
+public class ExternalApiService(IConfiguration configuration, ILogger<ExternalApiService> logger)
+{
+    // Dependencies are automatically available as fields
+}
+```
+
+### Area Determination
+The application determines whether a unit belongs to Mining or Hauling based on:
+- **Mining**: IPD, Kerinci, Pit, Front, D3-, EX- prefixes
+- **Hauling**: CSA, KM, HD-, H prefixes
+
+You can adjust this logic in `DataAggregationService.cs` > `DetermineArea()` method.
+
+## 🐛 Troubleshooting
+
+### SSE Connection Issues
+- Check CORS configuration
+- Verify API is running and accessible
+- Check browser console for errors
+- Ensure firewall allows SSE connections
+
+### Background Job Not Running
+- Check logs for errors
+- Verify External API credentials
+- Check rate limiting (1 login per minute)
+
+### No Data Showing
+- Verify database migrations are applied
+- Check if background job has run at least once
+- Verify External API is returning data
+
+## 📄 License
+
+This project is proprietary and confidential.
+
+## 👥 Contributors
+
+- Development Team
+
+## 📞 Support
+
+For issues and questions, contact the development team.
+
+---
+
+**Last Updated:** February 1, 2026
