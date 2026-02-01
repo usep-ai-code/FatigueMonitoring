@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/Backend/">
+    <Project Path="FatigueMonitoring.Web.Api/FatigueMonitoring.Web.Api.csproj" />
+  </Folder>
+  <Folder Name="/FrontEnd/">
+    <Project Path="fatigue-monitoring.mockup/fatigue-monitoring.mockup.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <Project Path="fatigue-monitoring.react/fatigue-monitoring.react.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+</Solution>
