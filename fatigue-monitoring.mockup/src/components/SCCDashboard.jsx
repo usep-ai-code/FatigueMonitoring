@@ -10,19 +10,15 @@ import {
   Moon, 
   Sun,
   Radio,
-  Navigation,
   Users,
   Wifi,
   WifiOff,
-  RefreshCw,
   MapPin,
-  Siren,
   ShieldAlert,
   Bell,
   X,
   LayoutGrid,
   Timer,
-  Maximize2,
   Camera,
   EyeOff,
   Filter,
@@ -30,11 +26,28 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+const emptyDashboard = {
+  generatedAtUtc: null,
+  deviceHealth: {
+    totalDevices: 0,
+    onlineDevices: 0,
+    offlineDevices: 0,
+    coveragePercent: 0
+  },
+  areaKpis: [],
+  areaDistribution: [],
+  activeAlerts: [],
+  delayedAlerts: [],
+  recurrentUnits: [],
+  highRiskAreas: []
+};
+
 const SCCDashboard = () => {
   const [darkMode, setDarkMode] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedArea, setSelectedArea] = useState('All'); 
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [sseStatus, setSseStatus] = useState('Connecting');
+  const [dashboardData, setDashboardData] = useState(emptyDashboard);
   
   const [notifications, setNotifications] = useState([]);
   const [selectedAlert, setSelectedAlert] = useState(null);
@@ -46,6 +59,8 @@ const SCCDashboard = () => {
   const activeFatigueListContainerRef = useRef(null);
   const recurrentListContainerRef = useRef(null);
   const highRiskListContainerRef = useRef(null); 
+  const knownAlertIdsRef = useRef(new Set());
+  const hasInitializedAlertsRef = useRef(false);
 
   // --- PAGINATION STATES ---
   const [miningPage, setMiningPage] = useState(1);
@@ -142,12 +157,6 @@ const SCCDashboard = () => {
     setHighRiskPage(1);
   }, [selectedArea, selectedLocationFilter]);
 
-  const getTimeAgo = (minutes) => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - minutes);
-    return d.toLocaleTimeString('en-GB', { hour12: false });
-  };
-
   const addNotification = (title, message, type = 'critical') => {
     const id = Date.now() + Math.random();
     const newNotif = { id, title, message, type };
@@ -160,237 +169,190 @@ const SCCDashboard = () => {
   const removeNotification = (id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
+  const normalizeDashboard = (payload) => ({
+    ...emptyDashboard,
+    ...payload,
+    deviceHealth: {
+      ...emptyDashboard.deviceHealth,
+      ...(payload?.deviceHealth ?? {})
+    },
+    areaKpis: payload?.areaKpis ?? [],
+    areaDistribution: payload?.areaDistribution ?? [],
+    activeAlerts: payload?.activeAlerts ?? [],
+    delayedAlerts: payload?.delayedAlerts ?? [],
+    recurrentUnits: payload?.recurrentUnits ?? [],
+    highRiskAreas: payload?.highRiskAreas ?? []
+  });
 
-  // --- MOCK DATA ---
-  const [alerts, setAlerts] = useState([
-    { id: 101, unit: 'DT-402', operator: 'Budi S.', type: 'Fatigue', area: 'Mining', location: 'Manado - Front A', time: getTimeAgo(45), status: 'Open', speed: '0 km/h', count: 2 },
-    { id: 102, unit: 'DT-112', operator: 'Dedi S.', type: 'Fatigue', area: 'Hauling', location: 'KM 22', time: getTimeAgo(35), status: 'Open', speed: '38 km/h', count: 1 },
-    { id: 103, unit: 'DT-555', operator: 'Rian J.', type: 'Fatigue', area: 'Mining', location: 'Pit Utara', time: getTimeAgo(58), status: 'Open', speed: '0 km/h', count: 3 },
-    { id: 104, unit: 'HD-777', operator: 'Doni K.', type: 'Fatigue', area: 'Hauling', location: 'KM 12', time: getTimeAgo(42), status: 'Open', speed: '40 km/h', count: 2 },
-    { id: 105, unit: 'EX-202', operator: 'Yanto', type: 'Fatigue', area: 'Mining', location: 'Loading Point C', time: getTimeAgo(32), status: 'Open', speed: '0 km/h', count: 1 },
-    { id: 1, unit: 'DT-315', operator: 'Agus R.', type: 'Fatigue', area: 'Hauling', location: 'KM 30', time: getTimeAgo(5), status: 'Open', speed: '45 km/h', count: 1 },
-    { id: 3, unit: 'EX-201', operator: 'Dedi K.', type: 'Fatigue', area: 'Mining', location: 'Manado - Loading', time: getTimeAgo(15), status: 'Followed Up', speed: '0 km/h', count: 1 },
-    { id: 5, unit: 'GD-102', operator: 'Rudi H.', type: 'Fatigue', area: 'Mining', location: 'Manado - Disposal', time: getTimeAgo(10), status: 'Open', speed: '15 km/h', count: 1 },
-    { id: 6, unit: 'DT-399', operator: 'Eko P.', type: 'Fatigue', area: 'Mining', location: 'Manado - Ramp B', time: getTimeAgo(25), status: 'Open', speed: '18 km/h', count: 3 },
-    { id: 7, unit: 'WT-05', operator: 'Joko', type: 'Fatigue', area: 'Hauling', location: 'KM 45', time: getTimeAgo(2), status: 'Followed Up', speed: '30 km/h', count: 1 },
-    { id: 9, unit: 'DT-551', operator: 'Iwan', type: 'Fatigue', area: 'Mining', location: 'Manado - Front A', time: getTimeAgo(8), status: 'Open', speed: '10 km/h', count: 1 },
-    { id: 10, unit: 'DT-101', operator: 'Slamet', type: 'Fatigue', area: 'Mining', location: 'Manado - Front B', time: getTimeAgo(1), status: 'Open', speed: '12 km/h', count: 1 },
-    { id: 12, unit: 'DT-103', operator: 'Tono', type: 'Fatigue', area: 'Mining', location: 'Manado - Front C', time: getTimeAgo(4), status: 'Open', speed: '0 km/h', count: 1 },
-    
-    { id: 11, unit: 'DT-102', operator: 'Udin', type: 'Fatigue', area: 'Hauling', location: 'KM 10', time: getTimeAgo(3), status: 'Open', speed: '40 km/h', count: 1 },
-    { id: 14, unit: 'DT-205', operator: 'Asep K.', type: 'Fatigue', area: 'Hauling', location: 'KM 55', time: getTimeAgo(12), status: 'Open', speed: '42 km/h', count: 1 },
-    
-    { id: 21, unit: 'DT-999', operator: 'Recurrent Op 1', type: 'Fatigue', area: 'Hauling', location: 'KM 30', time: getTimeAgo(10), status: 'Open', speed: '30 km/h', count: 4 },
-    { id: 22, unit: 'DT-888', operator: 'Recurrent Op 2', type: 'Fatigue', area: 'Mining', location: 'Manado - Front A', time: getTimeAgo(5), status: 'Open', speed: '0 km/h', count: 5 },
-    { id: 23, unit: 'DT-777', operator: 'Recurrent Op 3', type: 'Fatigue', area: 'Hauling', location: 'KM 10', time: getTimeAgo(2), status: 'Open', speed: '35 km/h', count: 3 },
-    { id: 24, unit: 'DT-666', operator: 'Recurrent Op 4', type: 'Fatigue', area: 'Mining', location: 'Pit Utara', time: getTimeAgo(1), status: 'Open', speed: '0 km/h', count: 2 },
-    { id: 25, unit: 'DT-555', operator: 'Recurrent Op 5', type: 'Fatigue', area: 'Mining', location: 'Manado - Front A', time: getTimeAgo(3), status: 'Open', speed: '0 km/h', count: 2 },
-    { id: 26, unit: 'DT-444', operator: 'Recurrent Op 6', type: 'Fatigue', area: 'Hauling', location: 'KM 22', time: getTimeAgo(4), status: 'Open', speed: '40 km/h', count: 3 },
-    
-    { id: 301, unit: 'DT-Delayed1', operator: 'Late 1', type: 'Fatigue', area: 'Mining', location: 'Manado - Front A', time: getTimeAgo(35), status: 'Open', speed: '0 km/h', count: 1 },
-    { id: 302, unit: 'DT-Delayed2', operator: 'Late 2', type: 'Fatigue', area: 'Hauling', location: 'KM 22', time: getTimeAgo(40), status: 'Open', speed: '20 km/h', count: 1 },
-    { id: 303, unit: 'DT-Delayed3', operator: 'Late 3', type: 'Fatigue', area: 'Mining', location: 'Pit Utara', time: getTimeAgo(60), status: 'Open', speed: '0 km/h', count: 1 },
-  ]);
+  useEffect(() => {
+    let eventSource;
+    let reconnectTimer;
 
-  const filteredAlertsByArea = useMemo(() => {
-      return selectedArea === 'All' 
-        ? alerts 
-        : alerts.filter(a => a.area === selectedArea);
-  }, [alerts, selectedArea]);
+    const connect = () => {
+      setSseStatus('Connecting');
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+      const streamUrl = `${baseUrl.replace(/\/$/, '')}/api/dashboard/stream`;
 
-  const highRiskOperators = useMemo(() => {
-    const opMap = {};
-    filteredAlertsByArea.forEach(a => {
-        if (!opMap[a.operator]) {
-            opMap[a.operator] = { name: a.operator, unit: a.unit, events: 0, status: 'Active' }; 
+      eventSource = new EventSource(streamUrl);
+      eventSource.onopen = () => setSseStatus('Connected');
+      eventSource.onerror = () => {
+        setSseStatus('Disconnected');
+        eventSource.close();
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+      eventSource.onmessage = (event) => {
+        if (!event.data) return;
+        try {
+          const payload = JSON.parse(event.data);
+          setDashboardData(normalizeDashboard(payload));
+        } catch (error) {
+          console.error('Failed to parse SSE payload', error);
         }
-        opMap[a.operator].events += a.count;
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, []);
+
+  const { deviceHealth, areaKpis, areaDistribution, activeAlerts, delayedAlerts, recurrentUnits, highRiskAreas } = dashboardData;
+
+  useEffect(() => {
+    if (!activeAlerts.length) {
+      if (!hasInitializedAlertsRef.current) {
+        hasInitializedAlertsRef.current = true;
+      }
+      return;
+    }
+
+    const currentIds = new Set(activeAlerts.map(alert => alert.id));
+    if (!hasInitializedAlertsRef.current) {
+      knownAlertIdsRef.current = currentIds;
+      hasInitializedAlertsRef.current = true;
+      return;
+    }
+
+    activeAlerts.forEach(alert => {
+      if (!knownAlertIdsRef.current.has(alert.id)) {
+        addNotification('New Fatigue Alert!', `Unit ${alert.unit} detected in ${alert.location}`);
+      }
     });
+    knownAlertIdsRef.current = currentIds;
+  }, [activeAlerts]);
 
-    return Object.values(opMap)
-        .filter(op => op.events > 1)
-        .sort((a, b) => b.events - a.events);
-  }, [filteredAlertsByArea]);
+  useEffect(() => {
+    if (!selectedAlert) return;
+    const updatedAlert = [...activeAlerts, ...delayedAlerts].find(alert => alert.id === selectedAlert.id);
+    if (updatedAlert) {
+      setSelectedAlert(updatedAlert);
+    } else {
+      setSelectedAlert(null);
+    }
+  }, [activeAlerts, delayedAlerts, selectedAlert]);
 
-  const highFreqZones = useMemo(() => {
-    const zoneMap = {};
-    filteredAlertsByArea.forEach(a => {
-        if (!zoneMap[a.location]) {
-            zoneMap[a.location] = { location: a.location, count: 0, area: a.area };
-        }
-        zoneMap[a.location].count += 1;
+  const areaKpiMap = useMemo(() => {
+    const map = {
+      All: { totalAlarms: 0, followedUp: 0, waitingFollowUp: 0 },
+      Mining: { totalAlarms: 0, followedUp: 0, waitingFollowUp: 0 },
+      Hauling: { totalAlarms: 0, followedUp: 0, waitingFollowUp: 0 }
+    };
+    areaKpis.forEach(kpi => {
+      map[kpi.area] = kpi;
     });
+    return map;
+  }, [areaKpis]);
 
-    return Object.values(zoneMap)
-        .sort((a, b) => b.count - a.count);
-  }, [filteredAlertsByArea]);
+  const currentKpi = areaKpiMap[selectedArea] ?? areaKpiMap.All;
 
-  const deviceHealth = {
-    total: 142,
-    online: 135,
-    offline: 7,
-    coverage: 95
+  const areaSummary = {
+    Mining: areaKpiMap.Mining,
+    Hauling: areaKpiMap.Hauling
   };
+
+  const stats = useMemo(() => {
+    return {
+      totalToday: currentKpi.totalAlarms ?? 0,
+      followedUpToday: currentKpi.followedUp ?? 0,
+      activeOpen: currentKpi.waitingFollowUp ?? 0
+    };
+  }, [currentKpi]);
+
+  const areaDistributionByArea = useMemo(() => {
+    return {
+      Mining: areaDistribution.filter(item => item.area === 'Mining'),
+      Hauling: areaDistribution.filter(item => item.area === 'Hauling')
+    };
+  }, [areaDistribution]);
+
+  const filteredActiveAlerts = useMemo(() => {
+    return activeAlerts.filter(alert => {
+      if (selectedLocationFilter) {
+        return alert.location === selectedLocationFilter;
+      }
+      return selectedArea === 'All' || alert.area === selectedArea;
+    });
+  }, [activeAlerts, selectedArea, selectedLocationFilter]);
+
+  const filteredDelayedAlerts = useMemo(() => {
+    return delayedAlerts.filter(alert => {
+      if (selectedLocationFilter) {
+        return alert.location === selectedLocationFilter;
+      }
+      return selectedArea === 'All' || alert.area === selectedArea;
+    });
+  }, [delayedAlerts, selectedArea, selectedLocationFilter]);
+
+  const filteredRecurrentUnits = useMemo(() => {
+    if (selectedArea === 'All') return recurrentUnits;
+    return recurrentUnits.filter(unit => unit.area === selectedArea);
+  }, [recurrentUnits, selectedArea]);
+
+  const filteredHighRiskAreas = useMemo(() => {
+    if (selectedArea === 'All') return highRiskAreas;
+    return highRiskAreas.filter(area => area.area === selectedArea);
+  }, [highRiskAreas, selectedArea]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const areas = ['Mining', 'Hauling'];
-      const randomArea = areas[Math.floor(Math.random() * areas.length)];
-      const uniqueId = Date.now() + Math.floor(Math.random() * 100); 
-      
-      const newAlert = {
-        id: uniqueId,
-        unit: `DT-${Math.floor(Math.random() * 900) + 100}`, 
-        operator: 'Driver Baru',
-        type: 'Fatigue',
-        area: randomArea,
-        location: randomArea === 'Mining' ? `Manado - Front ${['A','B','C'][Math.floor(Math.random()*3)]}` : `KM ${Math.floor(Math.random() * 60)}`,
-        time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-        status: 'Open',
-        speed: `${Math.floor(Math.random() * 40) + 10} km/h`,
-        count: 1
-      };
-
-      setAlerts(prev => {
-        if (prev.some(a => a.id === uniqueId)) return prev;
-        return [newAlert, ...prev];
-      });
-      
-      addNotification('New Fatigue Alert!', `Unit ${newAlert.unit} detected in ${newAlert.location}`);
-
-    }, 20000); 
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const getOpenDurationValue = (timeStr) => {
-    const parts = timeStr.split(/[:.]/); 
-    const h = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    const s = parseInt(parts[2] || '0', 10);
-
-    if (isNaN(h) || isNaN(m)) return 0;
-
-    const eventTime = new Date();
-    eventTime.setHours(h, m, s);
-    
+  const getOpenDurationValue = (openedAtUtc) => {
+    if (!openedAtUtc) return 0;
+    const eventTime = new Date(openedAtUtc);
+    if (Number.isNaN(eventTime.getTime())) return 0;
     const diffMs = currentTime - eventTime;
     const diffMins = Math.floor(diffMs / 60000);
     return diffMins < 0 ? 0 : diffMins;
   };
 
-  const getOpenDuration = (timeStr) => {
-    return getOpenDurationValue(timeStr);
+  const getOpenDuration = (openedAtUtc) => {
+    return getOpenDurationValue(openedAtUtc);
   };
 
-  const filteredAlerts = useMemo(() => {
-    return alerts.filter(alert => {
-      if (selectedLocationFilter) {
-          return alert.location === selectedLocationFilter && alert.status === 'Open';
-      }
-      const areaMatch = selectedArea === 'All' || alert.area === selectedArea;
-      const statusMatch = alert.status === 'Open'; 
-      return areaMatch && statusMatch;
-    });
-  }, [alerts, selectedArea, selectedLocationFilter]);
-
-  const overdueAlerts = useMemo(() => {
-    return filteredAlertsByArea.filter(alert => {
-      return alert.status === 'Open' && getOpenDurationValue(alert.time) > 30;
-    });
-  }, [filteredAlertsByArea, currentTime]); 
-
-  const areaSummary = useMemo(() => {
-    const summary = {
-      Mining: { open: 0, resolved: 0, total: 0 },
-      Hauling: { open: 0, resolved: 0, total: 0 }
-    };
-
-    alerts.forEach(alert => {
-      if (summary[alert.area]) {
-        summary[alert.area].total += 1;
-        if (alert.status === 'Open') {
-          summary[alert.area].open += 1;
-        } else if (alert.status === 'Followed Up') {
-          summary[alert.area].resolved += 1;
-        }
-      }
-    });
-
-    return summary;
-  }, [alerts]);
-
-  const locationStats = useMemo(() => {
-    const stats = { Mining: {}, Hauling: {} };
-    const openAlerts = alerts.filter(a => a.status === 'Open');
-
-    openAlerts.forEach(alert => {
-      if (stats[alert.area]) {
-        if (!stats[alert.area][alert.location]) {
-          stats[alert.area][alert.location] = 0;
-        }
-        stats[alert.area][alert.location]++;
-      }
-    });
-    return stats;
-  }, [alerts]);
-
-  const stats = useMemo(() => {
-    const baseData = filteredAlertsByArea; 
-    
-    const totalToday = baseData.length; 
-    const activeOpen = baseData.filter(a => a.status === 'Open').length; 
-    const followedUpToday = baseData.filter(a => a.status === 'Followed Up').length;
-    return { totalToday, followedUpToday, activeOpen };
-  }, [filteredAlertsByArea]); 
-
-  const handleManualSync = () => {
-    setIsSyncing(true);
-    setTimeout(() => {
-        setAlerts(prev => {
-            const openAlerts = prev.filter(a => a.status === 'Open');
-            if (openAlerts.length > 0) {
-                const randomAlert = openAlerts[Math.floor(Math.random() * openAlerts.length)];
-                return prev.map(a => a.id === randomAlert.id ? { ...a, status: 'Followed Up' } : a);
-            }
-            return prev;
-        });
-        setIsSyncing(false);
-    }, 1500);
+  const formatTime = (openedAtUtc) => {
+    if (!openedAtUtc) return '--:--:--';
+    const eventTime = new Date(openedAtUtc);
+    if (Number.isNaN(eventTime.getTime())) return '--:--:--';
+    return eventTime.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   };
 
-  const simulateBurst = () => {
-    const newAlerts = [];
-    const areas = ['Mining', 'Hauling'];
-    
-    for (let i = 0; i < 5; i++) {
-        const randomArea = areas[Math.floor(Math.random() * areas.length)];
-        const uniqueId = Date.now() + i + Math.floor(Math.random() * 1000);
-        
-        const newAlert = {
-            id: uniqueId,
-            unit: `DT-${Math.floor(Math.random() * 900) + 100}`, 
-            operator: `Simulated Driver ${i+1}`,
-            type: 'Fatigue',
-            area: randomArea,
-            location: randomArea === 'Mining' ? `Manado - Front ${['A','B','C'][Math.floor(Math.random()*3)]}` : `KM ${Math.floor(Math.random() * 60)}`,
-            time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-            status: 'Open',
-            speed: `${Math.floor(Math.random() * 40) + 10} km/h`,
-            count: 1
-        };
-        newAlerts.push(newAlert);
-        setTimeout(() => {
-            addNotification('CRITICAL BURST!', `Unit ${newAlert.unit} - ${newAlert.location}`, 'critical');
-        }, i * 300); 
-    }
-    setAlerts(prev => [...newAlerts, ...prev]);
+  const formatSpeed = (speedKph) => {
+    if (!Number.isFinite(speedKph)) return 'N/A';
+    return `${speedKph.toFixed(1)} km/h`;
   };
+
+  const formatCoordinate = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return 'N/A';
+    return value.toFixed(5);
+  };
+
+  const filteredAlerts = filteredActiveAlerts;
+  const overdueAlerts = filteredDelayedAlerts;
 
   const handleAreaTabClick = (area) => {
       setSelectedArea(area);
@@ -433,6 +395,11 @@ const SCCDashboard = () => {
 
   const getCardBg = () => darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300 shadow-sm';
   const getBodyBg = () => darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-200 text-slate-800';
+  const getSseStatusColor = () => {
+    if (sseStatus === 'Connected') return 'bg-emerald-500';
+    if (sseStatus === 'Connecting') return 'bg-amber-400 animate-pulse';
+    return 'bg-red-500';
+  };
 
   const getAreaTitle = () => selectedArea === 'All' ? '' : `${selectedArea.toUpperCase()} `;
 
@@ -509,11 +476,11 @@ const SCCDashboard = () => {
                             <div className="grid grid-cols-2 gap-4 shrink-0 h-[12vh]">
                                  <div className={`p-6 rounded-xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
                                     <span className={`text-sm block uppercase tracking-wider font-bold mb-1 ${darkMode ? 'text-slate-300' : 'opacity-60'}`}>Vehicle Speed</span>
-                                    <span className="font-mono font-bold text-5xl">{selectedAlert.speed}</span>
+                                    <span className="font-mono font-bold text-5xl">{formatSpeed(selectedAlert.speedKph)}</span>
                                  </div>
                                  <div className={`p-6 rounded-xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
                                     <span className={`text-sm block uppercase tracking-wider font-bold mb-1 ${darkMode ? 'text-slate-300' : 'opacity-60'}`}>Fatigue Type</span>
-                                    <span className="font-bold text-4xl text-red-500">Microsleep</span>
+                                    <span className="font-bold text-4xl text-red-500">{selectedAlert.alarmType || 'Fatigue'}</span>
                                  </div>
                             </div>
                         </div>
@@ -533,7 +500,7 @@ const SCCDashboard = () => {
                             <div className={`p-6 rounded-xl border shrink-0 flex items-center justify-between ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
                                 <div>
                                     <span className={`text-sm block font-bold ${darkMode ? 'text-slate-300' : 'opacity-60'}`}>GPS Coordinates</span>
-                                    <span className="font-mono text-2xl font-medium text-blue-500">Lat: -2.341, Long: 115.421</span>
+                                    <span className="font-mono text-2xl font-medium text-blue-500">Lat: {formatCoordinate(selectedAlert.latitude)}, Long: {formatCoordinate(selectedAlert.longitude)}</span>
                                     <div className={`text-sm mt-2 ${darkMode ? 'text-slate-400' : 'opacity-50'}`}>Accuracy: ±2m</div>
                                 </div>
                                 <button className="flex items-center gap-3 px-8 py-4 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-bold text-xl transition-colors">
@@ -567,23 +534,22 @@ const SCCDashboard = () => {
         </div>
 
         <div className="flex items-center gap-[2vw]">
-          <button 
-              onClick={simulateBurst}
-              className={`p-[1vh] rounded-full transition-all hover:bg-slate-700 active:scale-95 text-amber-500 border border-amber-500/30`}
-              title="Simulate Burst"
-          >
-              <Zap size={32} className="w-[3vh] h-[3vh] fill-amber-500" />
-          </button>
+          <div className={`flex items-center gap-3 px-[1.2vw] py-[0.8vh] rounded-full border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300 shadow-sm'}`}>
+            <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${getSseStatusColor()}`}></div>
+            <span className={`text-[clamp(0.9rem,1.1vh,1.3rem)] font-semibold whitespace-nowrap ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+              SSE: {sseStatus}
+            </span>
+          </div>
 
           <div className={`hidden md:flex items-center gap-6 px-[1.5vw] py-[1vh] rounded-full border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300 shadow-sm'}`}>
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${deviceHealth.offline === 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
-              <span className={`text-[clamp(1rem,1.2vh,1.5rem)] font-semibold whitespace-nowrap ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Sensor Health: {deviceHealth.coverage}%</span>
+              <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${deviceHealth.offlineDevices === 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
+              <span className={`text-[clamp(1rem,1.2vh,1.5rem)] font-semibold whitespace-nowrap ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Sensor Health: {deviceHealth.coveragePercent}%</span>
             </div>
             <div className="h-6 w-px bg-slate-600/30"></div>
             <div className="flex items-center gap-4 text-[clamp(1rem,1.2vh,1.5rem)]">
-              <div className="flex items-center gap-2"><Wifi className="w-[2.5vh] h-[2.5vh] text-emerald-500" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{deviceHealth.online}</span></div>
-              <div className="flex items-center gap-2"><WifiOff className="w-[2.5vh] h-[2.5vh] text-red-500 ml-1" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{deviceHealth.offline}</span></div>
+              <div className="flex items-center gap-2"><Wifi className="w-[2.5vh] h-[2.5vh] text-emerald-500" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{deviceHealth.onlineDevices}</span></div>
+              <div className="flex items-center gap-2"><WifiOff className="w-[2.5vh] h-[2.5vh] text-red-500 ml-1" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{deviceHealth.offlineDevices}</span></div>
             </div>
           </div>
 
@@ -679,22 +645,22 @@ const SCCDashboard = () => {
                                             <Activity size={20} /> Mining
                                         </h3>
                                         <div className="flex items-center gap-3 text-[clamp(0.8rem,1vh,1.2rem)]">
-                                            <span className={darkMode ? 'text-slate-200 font-bold' : 'text-slate-600'}>{areaSummary.Mining.total} Total</span>
-                                            <span className="text-red-500 font-bold">{areaSummary.Mining.open} Open</span>
+                                            <span className={darkMode ? 'text-slate-200 font-bold' : 'text-slate-600'}>{areaSummary.Mining.totalAlarms} Total</span>
+                                            <span className="text-red-500 font-bold">{areaSummary.Mining.waitingFollowUp} Open</span>
                                         </div>
                                     </div>
                                     <div className="flex-1 flex flex-col justify-between overflow-hidden" ref={miningListContainerRef}>
                                         <div className="grid grid-cols-2 gap-3 mt-1">
-                                            {Object.keys(locationStats.Mining).length > 0 ? (
-                                                paginate(Object.entries(locationStats.Mining), miningPage, dynamicItemsPerPage.mining).map(([location, count]) => (
+                                            {areaDistributionByArea.Mining.length > 0 ? (
+                                                paginate(areaDistributionByArea.Mining, miningPage, dynamicItemsPerPage.mining).map(({ location, openCount }) => (
                                                     <div key={location} onClick={() => { setSelectedArea('Mining'); setSelectedLocationFilter(location); }} className={`p-3 rounded-xl border flex flex-col justify-between items-center text-center transition-all cursor-pointer hover:scale-105 ${selectedLocationFilter === location ? (darkMode ? 'bg-blue-900/40 border-blue-400 ring-1 ring-blue-500' : 'bg-blue-50 border-blue-500 ring-1 ring-blue-200') : (darkMode ? 'bg-slate-800 border-slate-600 hover:border-slate-500' : 'bg-white border-slate-200 shadow-sm hover:border-blue-300')}`}>
                                                         <span className={`text-[clamp(0.9rem,1.2vh,1.4rem)] font-medium mb-1 line-clamp-1 ${darkMode ? 'text-white' : 'text-slate-600'}`}>{location}</span>
-                                                        <span className="text-[clamp(1.8rem,2.5vh,3rem)] font-black text-red-500 leading-none">{count}</span>
+                                                        <span className="text-[clamp(1.8rem,2.5vh,3rem)] font-black text-red-500 leading-none">{openCount}</span>
                                                     </div>
                                                 ))
                                             ) : <div className="col-span-2 py-4 text-center text-slate-500 text-lg italic">No active alerts</div>}
                                         </div>
-                                        <PaginationControls currentPage={miningPage} totalPages={Math.ceil(Object.keys(locationStats.Mining).length / dynamicItemsPerPage.mining)} onPageChange={setMiningPage} />
+                                        <PaginationControls currentPage={miningPage} totalPages={Math.ceil(areaDistributionByArea.Mining.length / dynamicItemsPerPage.mining)} onPageChange={setMiningPage} />
                                     </div>
                                 </div>
                             )}
@@ -706,22 +672,22 @@ const SCCDashboard = () => {
                                             <Truck size={20} /> Hauling
                                         </h3>
                                         <div className="flex items-center gap-3 text-[clamp(0.8rem,1vh,1.2rem)]">
-                                            <span className={darkMode ? 'text-slate-200 font-bold' : 'text-slate-600'}>{areaSummary.Hauling.total} Total</span>
-                                            <span className="text-red-500 font-bold">{areaSummary.Hauling.open} Open</span>
+                                            <span className={darkMode ? 'text-slate-200 font-bold' : 'text-slate-600'}>{areaSummary.Hauling.totalAlarms} Total</span>
+                                            <span className="text-red-500 font-bold">{areaSummary.Hauling.waitingFollowUp} Open</span>
                                         </div>
                                     </div>
                                     <div className="flex-1 flex flex-col justify-between overflow-hidden" ref={haulingListContainerRef}>
                                         <div className="grid grid-cols-2 gap-3 mt-1">
-                                            {Object.keys(locationStats.Hauling).length > 0 ? (
-                                                paginate(Object.entries(locationStats.Hauling), haulingPage, dynamicItemsPerPage.hauling).map(([location, count]) => (
+                                            {areaDistributionByArea.Hauling.length > 0 ? (
+                                                paginate(areaDistributionByArea.Hauling, haulingPage, dynamicItemsPerPage.hauling).map(({ location, openCount }) => (
                                                     <div key={location} onClick={() => { setSelectedArea('Hauling'); setSelectedLocationFilter(location); }} className={`p-3 rounded-xl border flex flex-col justify-between items-center text-center transition-all cursor-pointer hover:scale-105 ${selectedLocationFilter === location ? (darkMode ? 'bg-teal-900/40 border-teal-400 ring-1 ring-teal-500' : 'bg-teal-50 border-teal-500 ring-1 ring-teal-200') : (darkMode ? 'bg-slate-800 border-slate-600 hover:border-slate-500' : 'bg-white border-slate-200 shadow-sm hover:border-teal-300')}`}>
                                                         <span className={`text-[clamp(0.9rem,1.2vh,1.4rem)] font-medium mb-1 line-clamp-1 ${darkMode ? 'text-white' : 'text-slate-600'}`}>{location}</span>
-                                                        <span className="text-[clamp(1.8rem,2.5vh,3rem)] font-black text-red-500 leading-none">{count}</span>
+                                                        <span className="text-[clamp(1.8rem,2.5vh,3rem)] font-black text-red-500 leading-none">{openCount}</span>
                                                     </div>
                                                 ))
                                             ) : <div className="col-span-2 py-4 text-center text-slate-500 text-lg italic">No active alerts</div>}
                                         </div>
-                                        <PaginationControls currentPage={haulingPage} totalPages={Math.ceil(Object.keys(locationStats.Hauling).length / dynamicItemsPerPage.hauling)} onPageChange={setHaulingPage} />
+                                        <PaginationControls currentPage={haulingPage} totalPages={Math.ceil(areaDistributionByArea.Hauling.length / dynamicItemsPerPage.hauling)} onPageChange={setHaulingPage} />
                                     </div>
                                 </div>
                             )}
@@ -752,7 +718,7 @@ const SCCDashboard = () => {
                                             <div className={`text-[1rem] ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{alert.location}</div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-[1.2rem] font-black text-red-500 font-mono">+{getOpenDurationValue(alert.time)}m</div>
+                                            <div className="text-[1.2rem] font-black text-red-500 font-mono">+{getOpenDurationValue(alert.openedAtUtc)}m</div>
                                             <div className="text-[0.9rem] text-red-400 uppercase font-bold">LATE</div>
                                         </div>
                                     </div>
@@ -775,23 +741,23 @@ const SCCDashboard = () => {
                             RECURRENT UNITS
                         </h3>
                     </div>
-                    <span className="bg-red-600 text-white text-[1rem] font-bold px-3 py-1 rounded-full">{highRiskOperators.length} Total</span>
+                    <span className="bg-red-600 text-white text-[1rem] font-bold px-3 py-1 rounded-full">{filteredRecurrentUnits.length} Total</span>
                   </div>
                   <div className="flex-1 flex flex-col justify-between overflow-hidden" ref={recurrentListContainerRef}>
                     <div className="flex-1 space-y-2">
-                        {highRiskOperators.length > 0 ? (
-                            paginate(highRiskOperators, recurrentPage, dynamicItemsPerPage.recurrent).map((op, idx) => (
+                        {filteredRecurrentUnits.length > 0 ? (
+                            paginate(filteredRecurrentUnits, recurrentPage, dynamicItemsPerPage.recurrent).map((op, idx) => (
                             <div key={idx} className={`px-3 py-2 rounded-xl border-l-4 border-red-500 flex justify-between items-center ${darkMode ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}>
                                 <div>
                                     <div className={`font-bold text-[clamp(1rem,1.2vh,1.4rem)] ${darkMode ? 'text-white' : 'text-slate-800'}`}>{op.unit}</div>
-                                    <div className={`text-[0.9rem] ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{op.name} • <span className="text-red-500 font-semibold">{op.events} events</span></div>
+                                    <div className={`text-[0.9rem] ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{op.operator} • <span className="text-red-500 font-semibold">{op.events} events</span></div>
                                 </div>
                                 <div className="text-[0.9rem] text-red-500 font-bold px-3 py-1 bg-red-500/10 rounded">MONITORING</div>
                             </div>
                             ))
                         ) : <div className="flex h-full items-center justify-center text-slate-500 text-lg">No recurrent data</div>}
                     </div>
-                    <PaginationControls currentPage={recurrentPage} totalPages={Math.ceil(highRiskOperators.length / dynamicItemsPerPage.recurrent)} onPageChange={setRecurrentPage} />
+                    <PaginationControls currentPage={recurrentPage} totalPages={Math.ceil(filteredRecurrentUnits.length / dynamicItemsPerPage.recurrent)} onPageChange={setRecurrentPage} />
                   </div>
                 </div>
 
@@ -804,19 +770,19 @@ const SCCDashboard = () => {
                             HIGH RISK AREA
                         </h3>
                     </div>
-                    <span className="bg-orange-600 text-white text-[1rem] font-bold px-3 py-1 rounded-full">{highFreqZones.length} Total</span>
+                    <span className="bg-orange-600 text-white text-[1rem] font-bold px-3 py-1 rounded-full">{filteredHighRiskAreas.length} Total</span>
                   </div>
                   <div className="flex-1 flex flex-col justify-between overflow-hidden" ref={highRiskListContainerRef}>
                         <div className="flex-1 space-y-2">
-                            {highFreqZones.length > 0 ? (
-                            paginate(highFreqZones, highRiskPage, dynamicItemsPerPage.highRisk).map((zone, idx) => (
+                            {filteredHighRiskAreas.length > 0 ? (
+                            paginate(filteredHighRiskAreas, highRiskPage, dynamicItemsPerPage.highRisk).map((zone, idx) => (
                             <div key={idx} className={`px-3 py-2 rounded-xl border flex justify-between items-center ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-white border-slate-200'}`}>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="w-3 h-3 rounded-full bg-red-500"></span>
                                         <span className={`text-[clamp(1rem,1.2vh,1.4rem)] font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{zone.location}</span>
                                     </div>
-                                    <div className={`text-[0.9rem] ml-5 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Events: <span className="font-mono font-bold text-slate-400">{zone.count}</span></div>
+                                    <div className={`text-[0.9rem] ml-5 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Events: <span className="font-mono font-bold text-slate-400">{zone.events}</span></div>
                                 </div>
                                 <div className={`text-[0.9rem] px-3 py-1 rounded border flex items-center gap-2 font-medium ${zone.area === 'Mining' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-teal-500/10 text-teal-500 border-teal-500/20'}`}>
                                     {zone.area === 'Mining' ? <Activity size={16} /> : <Truck size={16} />} {zone.area.toUpperCase()}
@@ -825,7 +791,7 @@ const SCCDashboard = () => {
                             ))
                             ) : <div className="flex h-full items-center justify-center text-slate-500 text-lg">No high risk data</div>}
                         </div>
-                        <PaginationControls currentPage={highRiskPage} totalPages={Math.ceil(highFreqZones.length / dynamicItemsPerPage.highRisk)} onPageChange={setHighRiskPage} />
+                        <PaginationControls currentPage={highRiskPage} totalPages={Math.ceil(filteredHighRiskAreas.length / dynamicItemsPerPage.highRisk)} onPageChange={setHighRiskPage} />
                     </div>
                 </div>
             </div>
@@ -876,8 +842,8 @@ const SCCDashboard = () => {
                             <div key={alert.id} className={`relative p-[1.5vh] rounded-xl border transition-all hover:scale-[1.01] cursor-pointer group ${darkMode ? 'bg-slate-800 border-l-8 border-l-red-500 border-y-slate-700 border-r-slate-700 hover:border-slate-500' : 'bg-white border-l-8 border-l-red-500 border-y-slate-200 border-r-slate-200 shadow-sm hover:shadow-md'}`} onClick={() => setSelectedAlert(alert)}>
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-3">
-                                        <span className={`px-2 py-1 rounded-md text-[0.9rem] font-bold uppercase bg-red-600 text-white`}>{alert.type}</span>
-                                        <span className={`text-[1rem] font-mono ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{alert.time}</span>
+                                        <span className={`px-2 py-1 rounded-md text-[0.9rem] font-bold uppercase bg-red-600 text-white`}>{alert.alarmType || 'Fatigue'}</span>
+                                        <span className={`text-[1rem] font-mono ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{formatTime(alert.openedAtUtc)}</span>
                                     </div>
                                     <span className="text-[0.9rem] text-red-500 font-bold flex items-center gap-2 animate-pulse"><AlertTriangle size={14} /> ACTIVE</span>
                                 </div>
@@ -885,12 +851,12 @@ const SCCDashboard = () => {
                                     <div className={`p-2 rounded-xl ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}><Truck className={`w-[3vh] h-[3vh] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`} /></div>
                                     <div>
                                         <h4 className={`font-bold text-[clamp(1.2rem,1.5vh,1.8rem)] ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{alert.unit}</h4>
-                                        <p className={`text-[1rem] ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{alert.operator} • {alert.count}x Today</p>
+                                        <p className={`text-[1rem] ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{alert.operator} • {(alert.occurrences ?? 1)}x Today</p>
                                     </div>
                                 </div>
                                 <div className={`text-[1rem] p-2 rounded-lg flex justify-between items-center ${darkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                                     <div className={`flex items-center gap-2 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}><Map size={18} /><span>{alert.location}</span></div>
-                                    <div className="flex items-center gap-2 text-red-400 font-mono font-bold animate-pulse"><Clock size={18} /><span>+{getOpenDuration(alert.time)}m</span></div>
+                                    <div className="flex items-center gap-2 text-red-400 font-mono font-bold animate-pulse"><Clock size={18} /><span>+{getOpenDuration(alert.openedAtUtc)}m</span></div>
                                 </div>
                             </div>
                         ))
