@@ -63,6 +63,7 @@ All aggregation tables use the `AI_` prefix and `_T` postfix:
 - `AI_RecurrentUnit_T` - Units with recurring fatigue events
 - `AI_HighRiskArea_T` - Areas with high fatigue event frequency
 - `AI_TokenCache_T` - External API token storage
+- `AI_SyncState_T` - Sync state tracking (last sync time, status)
 
 ## Configuration
 
@@ -80,10 +81,24 @@ All aggregation tables use the `AI_` prefix and `_T` postfix:
     "TokenRefreshIntervalMinutes": 1
   },
   "BackgroundJob": {
-    "DataFetchIntervalSeconds": 60,
-    "HeartbeatIntervalSeconds": 30
+    "DataFetchIntervalSeconds": 180,
+    "HeartbeatIntervalSeconds": 30,
+    "InitialStartTime": "2026-02-01 00:00:00",
+    "FetchWindowMinutes": 3
   }
 }
+```
+
+#### BackgroundJob Settings Explained:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `DataFetchIntervalSeconds` | Interval between data fetches (180s = 3 minutes) | 180 |
+| `HeartbeatIntervalSeconds` | SSE heartbeat interval | 30 |
+| `InitialStartTime` | Start time for first data fetch (WIB timezone) | 2026-02-01 00:00:00 |
+| `FetchWindowMinutes` | Window size for each fetch (minutes) | 3 |
+
+**Note**: The system stores the last sync time in `AI_SyncState_T` table. Each fetch retrieves data from `lastSyncTime` to `lastSyncTime + FetchWindowMinutes`. This ensures no data is missed even if the service restarts.
 ```
 
 ### Frontend (.env)

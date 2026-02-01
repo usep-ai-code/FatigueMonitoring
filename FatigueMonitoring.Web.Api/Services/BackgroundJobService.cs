@@ -4,8 +4,25 @@ namespace FatigueMonitoring.Web.Api.Services;
 
 public class BackgroundJobSettings
 {
-    public int DataFetchIntervalSeconds { get; set; } = 60;
+    /// <summary>
+    /// Interval between data fetches in seconds (default: 180 = 3 minutes)
+    /// </summary>
+    public int DataFetchIntervalSeconds { get; set; } = 180;
+    
+    /// <summary>
+    /// Interval between SSE heartbeats in seconds
+    /// </summary>
     public int HeartbeatIntervalSeconds { get; set; } = 30;
+    
+    /// <summary>
+    /// Initial start time for first data fetch (format: "yyyy-MM-dd HH:mm:ss")
+    /// </summary>
+    public string InitialStartTime { get; set; } = "2026-02-01 00:00:00";
+    
+    /// <summary>
+    /// Window size in minutes for each fetch (default: 3 minutes)
+    /// </summary>
+    public int FetchWindowMinutes { get; set; } = 3;
 }
 
 public class BackgroundJobService(

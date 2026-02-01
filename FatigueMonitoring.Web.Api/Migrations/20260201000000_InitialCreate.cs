@@ -202,6 +202,25 @@ namespace FatigueMonitoring.Web.Api.Migrations
                     table.PrimaryKey("PK_AI_TokenCache_T", x => x.Id);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "AI_SyncState_T",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SyncType = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    LastSyncTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    LastSyncRecordCount = table.Column<int>(type: "int", nullable: false),
+                    LastSyncStatus = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LastSyncError = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AI_SyncState_T", x => x.Id);
+                });
+
             // Create indexes
             migrationBuilder.CreateIndex(
                 name: "IX_AI_FatigueEvent_T_ExternalId",
@@ -283,11 +302,18 @@ namespace FatigueMonitoring.Web.Api.Migrations
                 name: "IX_AI_TokenCache_T_TokenType",
                 table: "AI_TokenCache_T",
                 column: "TokenType");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AI_SyncState_T_SyncType",
+                table: "AI_SyncState_T",
+                column: "SyncType",
+                unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(name: "AI_SyncState_T");
             migrationBuilder.DropTable(name: "AI_TokenCache_T");
             migrationBuilder.DropTable(name: "AI_HighRiskArea_T");
             migrationBuilder.DropTable(name: "AI_RecurrentUnit_T");

@@ -13,6 +13,7 @@ public class FatigueMonitoringDbContext(DbContextOptions<FatigueMonitoringDbCont
     public DbSet<AI_RecurrentUnit_T> RecurrentUnits => Set<AI_RecurrentUnit_T>();
     public DbSet<AI_HighRiskArea_T> HighRiskAreas => Set<AI_HighRiskArea_T>();
     public DbSet<AI_TokenCache_T> TokenCache => Set<AI_TokenCache_T>();
+    public DbSet<AI_SyncState_T> SyncStates => Set<AI_SyncState_T>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,6 +95,14 @@ public class FatigueMonitoringDbContext(DbContextOptions<FatigueMonitoringDbCont
             entity.ToTable("AI_TokenCache_T");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.TokenType);
+        });
+
+        // AI_SyncState_T
+        modelBuilder.Entity<AI_SyncState_T>(entity =>
+        {
+            entity.ToTable("AI_SyncState_T");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.SyncType).IsUnique();
         });
     }
 }

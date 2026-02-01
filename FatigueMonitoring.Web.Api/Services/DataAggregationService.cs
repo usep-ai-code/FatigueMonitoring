@@ -2,6 +2,7 @@ using FatigueMonitoring.Web.Api.Data;
 using FatigueMonitoring.Web.Api.DTOs;
 using FatigueMonitoring.Web.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FatigueMonitoring.Web.Api.Services;
 
@@ -15,21 +16,57 @@ public interface IDataAggregationService
 public class DataAggregationService(
     IExternalApiService externalApiService,
     IServiceScopeFactory scopeFactory,
+    IOptions<BackgroundJobSettings> jobSettings,
     ILogger<DataAggregationService> logger) : IDataAggregationService
 {
     private const int DelayThresholdMinutes = 30;
+    private const string SyncTypeExternalApi = "ExternalApiEvents";
+    private readonly BackgroundJobSettings _jobSettings = jobSettings.Value;
 
     public async Task FetchAndProcessEventsAsync(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Starting data fetch from external API");
 
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FatigueMonitoringDbContext>();
+
         try
         {
-            // Fetch verified true alarms from the last 24 hours
-            var endDate = DateTime.UtcNow.AddHours(7); // Convert to WIB (UTC+7)
-            var startDate = endDate.AddHours(-24);
+            // Get or create sync state
+            var syncState = await GetOrCreateSyncStateAsync(dbContext, cancellationToken);
+            
+            // Mark sync as in progress
+            syncState.LastSyncStatus = "InProgress";
+            syncState.UpdatedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
 
-            // Get all true alarms
+            // Calculate date range: from last sync time to last sync time + window minutes
+            var startDate = syncState.LastSyncTime;
+            var endDate = startDate.AddMinutes(_jobSettings.FetchWindowMinutes);
+            
+            // Don't fetch future data - cap at current time
+            var nowWib = DateTime.UtcNow.AddHours(7); // Convert to WIB (UTC+7)
+            if (endDate > nowWib)
+            {
+                endDate = nowWib;
+            }
+
+            // If start date is already at or past current time, skip this fetch
+            if (startDate >= nowWib)
+            {
+                logger.LogInformation("Already caught up to current time. No new data to fetch.");
+                syncState.LastSyncStatus = "Success";
+                syncState.LastSyncError = null;
+                syncState.UpdatedAt = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
+            logger.LogInformation("Fetching events from {StartDate} to {EndDate} (WIB)", 
+                startDate.ToString("yyyy-MM-dd HH:mm:ss"), 
+                endDate.ToString("yyyy-MM-dd HH:mm:ss"));
+
+            // Get all true alarms in the time window
             var allEvents = new List<EventData>();
             int page = 1;
             int totalPages = 1;
@@ -49,28 +86,98 @@ public class DataAggregationService(
                 }
                 else
                 {
+                    if (response?.Success != true)
+                    {
+                        logger.LogWarning("API returned unsuccessful response: {Message}", response?.Message);
+                    }
                     break;
                 }
-            } while (page <= totalPages && page <= 10); // Limit to 10 pages max
+            } while (page <= totalPages && page <= 20); // Limit to 20 pages max
 
-            logger.LogInformation("Fetched {Count} events from external API", allEvents.Count);
+            logger.LogInformation("Fetched {Count} events from external API for period {StartDate} to {EndDate}", 
+                allEvents.Count, startDate.ToString("yyyy-MM-dd HH:mm:ss"), endDate.ToString("yyyy-MM-dd HH:mm:ss"));
 
             // Process and store events
-            using var scope = scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<FatigueMonitoringDbContext>();
-
             foreach (var eventData in allEvents)
             {
                 await ProcessEventAsync(dbContext, eventData, cancellationToken);
             }
 
+            // Update sync state with new last sync time
+            syncState.LastSyncTime = endDate;
+            syncState.LastSyncRecordCount = allEvents.Count;
+            syncState.LastSyncStatus = "Success";
+            syncState.LastSyncError = null;
+            syncState.UpdatedAt = DateTime.UtcNow;
+
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Successfully processed and saved {Count} events", allEvents.Count);
+            logger.LogInformation("Successfully processed {Count} events. Next sync will start from {NextStart}", 
+                allEvents.Count, endDate.ToString("yyyy-MM-dd HH:mm:ss"));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error fetching and processing events");
+            
+            // Update sync state with error
+            try
+            {
+                var syncState = await dbContext.SyncStates
+                    .FirstOrDefaultAsync(s => s.SyncType == SyncTypeExternalApi, cancellationToken);
+                
+                if (syncState != null)
+                {
+                    syncState.LastSyncStatus = "Failed";
+                    syncState.LastSyncError = ex.Message;
+                    syncState.UpdatedAt = DateTime.UtcNow;
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
+            }
+            catch (Exception innerEx)
+            {
+                logger.LogError(innerEx, "Failed to update sync state with error");
+            }
         }
+    }
+
+    private async Task<AI_SyncState_T> GetOrCreateSyncStateAsync(
+        FatigueMonitoringDbContext dbContext, 
+        CancellationToken cancellationToken)
+    {
+        var syncState = await dbContext.SyncStates
+            .FirstOrDefaultAsync(s => s.SyncType == SyncTypeExternalApi, cancellationToken);
+
+        if (syncState == null)
+        {
+            // Parse initial start time from settings
+            DateTime initialStartTime;
+            if (!DateTime.TryParseExact(_jobSettings.InitialStartTime, "yyyy-MM-dd HH:mm:ss",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out initialStartTime))
+            {
+                // Default to 24 hours ago if parsing fails
+                initialStartTime = DateTime.UtcNow.AddHours(7).AddHours(-24); // WIB
+                logger.LogWarning("Failed to parse InitialStartTime '{InitialStartTime}', using default: {DefaultTime}",
+                    _jobSettings.InitialStartTime, initialStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
+            }
+
+            syncState = new AI_SyncState_T
+            {
+                SyncType = SyncTypeExternalApi,
+                LastSyncTime = initialStartTime,
+                LastSyncRecordCount = 0,
+                LastSyncStatus = "Pending",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            dbContext.SyncStates.Add(syncState);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            
+            logger.LogInformation("Created new sync state with initial start time: {InitialStartTime}", 
+                initialStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
+        }
+
+        return syncState;
     }
 
     private async Task ProcessEventAsync(FatigueMonitoringDbContext dbContext, EventData eventData, CancellationToken cancellationToken)
@@ -142,6 +249,7 @@ public class DataAggregationService(
             };
 
             dbContext.FatigueEvents.Add(newEvent);
+            logger.LogDebug("Added new event: {ExternalId} - {UnitName}", eventData.Id, eventData.Device?.Name);
         }
         else
         {
@@ -155,6 +263,7 @@ public class DataAggregationService(
             existingEvent.ImageUrl = imageUrl ?? existingEvent.ImageUrl;
             existingEvent.VideoUrl = videoUrl ?? existingEvent.VideoUrl;
             existingEvent.UpdatedAt = DateTime.UtcNow;
+            logger.LogDebug("Updated existing event: {ExternalId}", eventData.Id);
         }
     }
 
@@ -247,7 +356,7 @@ public class DataAggregationService(
         await CalculateHighRiskAreasAsync(dbContext, todayEvents, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Aggregation calculation completed");
+        logger.LogInformation("Aggregation calculation completed. Processed {Count} events for today.", todayEvents.Count);
     }
 
     private async Task CalculateDashboardSummaryAsync(

@@ -193,6 +193,24 @@ BEGIN
 END
 GO
 
+-- 9. AI_SyncState_T - Sync state tracking
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AI_SyncState_T' AND xtype='U')
+BEGIN
+    CREATE TABLE [dbo].[AI_SyncState_T] (
+        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [SyncType] NVARCHAR(450) NOT NULL,
+        [LastSyncTime] DATETIME2 NOT NULL,
+        [LastSyncRecordCount] INT NOT NULL,
+        [LastSyncStatus] NVARCHAR(MAX) NOT NULL,
+        [LastSyncError] NVARCHAR(MAX) NULL,
+        [CreatedAt] DATETIME2 NOT NULL,
+        [UpdatedAt] DATETIME2 NOT NULL
+    );
+    
+    CREATE UNIQUE INDEX [IX_AI_SyncState_T_SyncType] ON [dbo].[AI_SyncState_T] ([SyncType]);
+END
+GO
+
 -- EF Core Migrations History Table
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='__EFMigrationsHistory' AND xtype='U')
 BEGIN
