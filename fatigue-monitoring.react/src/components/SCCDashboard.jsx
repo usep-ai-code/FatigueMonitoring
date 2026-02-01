@@ -54,6 +54,7 @@ const SCCDashboard = () => {
   const [sseStatus, setSseStatus] = useState('connecting')
 
   const sseStatusRef = useRef('connecting')
+  const lastEventAtRef = useRef(Date.now())
   const hasLoadedRef = useRef(false)
   const previousAlertIdsRef = useRef(new Set())
 
@@ -161,6 +162,7 @@ const SCCDashboard = () => {
     const eventSource = new EventSource(streamUrl)
 
     eventSource.onopen = () => {
+      lastEventAtRef.current = Date.now()
       setSseStatus('connected')
     }
 
@@ -176,6 +178,7 @@ const SCCDashboard = () => {
       try {
         const data = JSON.parse(event.data)
         setSnapshot(data)
+        lastEventAtRef.current = Date.now()
         setSseStatus('connected')
       } catch (error) {
         console.error('Failed to parse snapshot payload', error)
@@ -183,6 +186,7 @@ const SCCDashboard = () => {
     })
 
     eventSource.addEventListener('heartbeat', () => {
+      lastEventAtRef.current = Date.now()
       if (sseStatusRef.current !== 'connected') {
         setSseStatus('connected')
       }
@@ -191,6 +195,17 @@ const SCCDashboard = () => {
     return () => {
       eventSource.close()
     }
+  }, [])
+
+  useEffect(() => {
+    const timeoutMs = 35000
+    const interval = setInterval(() => {
+      if (Date.now() - lastEventAtRef.current > timeoutMs) {
+        setSseStatus('disconnected')
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
