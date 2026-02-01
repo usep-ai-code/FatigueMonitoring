@@ -2,13 +2,16 @@ namespace FatigueMonitoring.Web.Api.Services;
 
 public class BackgroundAggregationJob(
     IServiceProvider serviceProvider,
+    IConfiguration configuration,
     ILogger<BackgroundAggregationJob> logger) : BackgroundService
 {
-    private readonly TimeSpan _interval = TimeSpan.FromMinutes(5); // Run every 5 minutes
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Background Aggregation Job started");
+        // Get interval from configuration (default 3 minutes)
+        var intervalMinutes = configuration.GetValue<int>("BackgroundJob:IntervalMinutes", 3);
+        var interval = TimeSpan.FromMinutes(intervalMinutes);
+        
+        logger.LogInformation("Background Aggregation Job started with {Minutes} minute interval", intervalMinutes);
 
         // Wait a bit before first run to allow app to fully start
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
@@ -24,14 +27,14 @@ public class BackgroundAggregationJob(
                 
                 await aggregationService.AggregateDataAsync();
 
-                logger.LogInformation("Aggregation cycle completed. Next run in {Minutes} minutes", _interval.TotalMinutes);
+                logger.LogInformation("Aggregation cycle completed. Next run in {Minutes} minutes", interval.TotalMinutes);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error in background aggregation job");
             }
 
-            await Task.Delay(_interval, stoppingToken);
+            await Task.Delay(interval, stoppingToken);
         }
 
         logger.LogInformation("Background Aggregation Job stopped");

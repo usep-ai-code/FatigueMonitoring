@@ -8,6 +8,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     // Raw Data Tables
     public DbSet<RawEvent> RawEvents { get; set; }
     public DbSet<RawFollowUp> RawFollowUps { get; set; }
+    
+    // Sync Metadata
+    public DbSet<SyncMetadata> SyncMetadata { get; set; }
 
     // Aggregation Tables (AI_ prefix, _T suffix)
     public DbSet<AI_DashboardStats_T> AI_DashboardStats_T { get; set; }
@@ -38,5 +41,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.Entity<AI_DashboardStats_T>()
             .HasIndex(s => s.Area);
+        
+        // Configure SyncMetadata unique key
+        modelBuilder.Entity<SyncMetadata>()
+            .HasIndex(s => s.SyncKey)
+            .IsUnique();
     }
 }

@@ -7,39 +7,128 @@ namespace FatigueMonitoring.Web.Api.Services;
 public class DataAggregationService(
     ApplicationDbContext context, 
     ExternalApiService externalApiService,
+    IConfiguration configuration,
     ILogger<DataAggregationService> logger)
 {
+    private const string SYNC_KEY = "EventsSync";
+    
     public async Task AggregateDataAsync()
     {
         logger.LogInformation("Starting data aggregation at {Time}", DateTime.UtcNow);
 
         try
         {
-            // 1. Fetch raw data from external API (last 24 hours)
-            var startDate = DateTime.UtcNow.AddHours(-24);
-            var endDate = DateTime.UtcNow;
+            // 1. Get last sync time
+            var syncMetadata = await GetOrCreateSyncMetadataAsync();
+            
+            // Update status to Running
+            syncMetadata.Status = "Running";
+            syncMetadata.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
 
-            // Fetch all events (both followed up and not)
+            // 2. Calculate time range (last 3 minutes from last sync)
+            var startDate = syncMetadata.LastSyncTime;
+            var endDate = startDate.AddMinutes(3);
+            
+            // Don't fetch future data
+            if (endDate > DateTime.UtcNow)
+            {
+                endDate = DateTime.UtcNow;
+            }
+
+            logger.LogInformation("Fetching events from {StartDate} to {EndDate}", startDate, endDate);
+
+            // 3. Fetch raw data from external API
             var allEvents = await externalApiService.GetEventsAsync(startDate, endDate);
+            
+            logger.LogInformation("Fetched {Count} events from external API", allEvents.Count);
             
             if (allEvents.Count > 0)
             {
                 await SaveRawEventsAsync(allEvents);
             }
 
-            // 2. Aggregate data into AI_ tables
+            // 4. Aggregate data into AI_ tables
             await AggregateActiveAlertsAsync();
             await AggregateDashboardStatsAsync();
             await AggregateAreaDistributionAsync();
             await AggregateRecurrentUnitsAsync();
             await AggregateHighRiskAreasAsync();
 
-            logger.LogInformation("Data aggregation completed successfully");
+            // 5. Update sync metadata
+            syncMetadata.LastSyncTime = endDate;
+            syncMetadata.NextSyncTime = endDate.AddMinutes(3);
+            syncMetadata.Status = "Success";
+            syncMetadata.ErrorMessage = null;
+            syncMetadata.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+
+            logger.LogInformation("Data aggregation completed successfully. Next sync at: {NextSync}", syncMetadata.NextSyncTime);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error during data aggregation");
+            
+            // Update sync metadata with error
+            var syncMetadata = await context.SyncMetadata
+                .FirstOrDefaultAsync(s => s.SyncKey == SYNC_KEY);
+            
+            if (syncMetadata != null)
+            {
+                syncMetadata.Status = "Failed";
+                syncMetadata.ErrorMessage = ex.Message;
+                syncMetadata.UpdatedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+            }
+            
+            throw;
         }
+    }
+
+    private async Task<SyncMetadata> GetOrCreateSyncMetadataAsync()
+    {
+        var syncMetadata = await context.SyncMetadata
+            .FirstOrDefaultAsync(s => s.SyncKey == SYNC_KEY);
+
+        if (syncMetadata == null)
+        {
+            // Get initial start time from configuration
+            var initialStartTimeStr = configuration["BackgroundJob:InitialStartTime"] ?? "2026-02-01 00:00:00";
+            
+            if (!DateTime.TryParse(initialStartTimeStr, out var initialStartTime))
+            {
+                initialStartTime = DateTime.UtcNow.AddDays(-1); // Default to 1 day ago
+                logger.LogWarning("Invalid InitialStartTime in configuration. Using default: {DefaultTime}", initialStartTime);
+            }
+            else
+            {
+                // Convert to UTC if not already
+                if (initialStartTime.Kind == DateTimeKind.Unspecified)
+                {
+                    initialStartTime = DateTime.SpecifyKind(initialStartTime, DateTimeKind.Utc);
+                }
+                else if (initialStartTime.Kind == DateTimeKind.Local)
+                {
+                    initialStartTime = initialStartTime.ToUniversalTime();
+                }
+            }
+
+            syncMetadata = new SyncMetadata
+            {
+                SyncKey = SYNC_KEY,
+                LastSyncTime = initialStartTime,
+                NextSyncTime = initialStartTime.AddMinutes(3),
+                Status = "Initialized",
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            context.SyncMetadata.Add(syncMetadata);
+            await context.SaveChangesAsync();
+            
+            logger.LogInformation("Created initial sync metadata with start time: {StartTime}", initialStartTime);
+        }
+
+        return syncMetadata;
     }
 
     private async Task SaveRawEventsAsync(List<EventItem> events)

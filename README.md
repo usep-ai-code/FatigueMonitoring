@@ -112,17 +112,36 @@ React Dashboard (Real-time updates)
    }
    ```
 
-3. **Run migrations:**
+3. **Configure initial sync time in `appsettings.json`:**
+   ```json
+   {
+     "BackgroundJob": {
+       "IntervalMinutes": 3,
+       "InitialStartTime": "2026-02-01 00:00:00"
+     }
+   }
+   ```
+   
+   Adjust `InitialStartTime` to when you want to start syncing data from.
+
+4. **Run migrations:**
    ```bash
    dotnet ef database update
    ```
 
-4. **Run the API:**
+5. **Run the API:**
    ```bash
    dotnet run
    ```
 
    The API will start on `http://localhost:5000`
+
+6. **Verify sync is working:**
+   ```bash
+   curl http://localhost:5000/api/sync/status
+   ```
+
+   You should see the sync metadata with status and timestamps.
 
 ### Frontend Setup
 
@@ -153,12 +172,28 @@ React Dashboard (Real-time updates)
 ### External API Rate Limiting
 The application respects the TransTrack API rate limit of 1 login request per minute. The `ExternalApiService` automatically manages token refresh and rate limiting.
 
-### Background Job Schedule
-The background aggregation job runs every 5 minutes. To adjust:
-```csharp
-// In BackgroundAggregationJob.cs
-private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
+### Background Job Configuration
+The background aggregation job runs every **3 minutes** and fetches data incrementally.
+
+**Configuration in `appsettings.json`:**
+```json
+{
+  "BackgroundJob": {
+    "IntervalMinutes": 3,
+    "InitialStartTime": "2026-02-01 00:00:00"
+  }
+}
 ```
+
+**How it works:**
+1. Job runs every 3 minutes
+2. Fetches data from `LastSyncTime` to `LastSyncTime + 3 minutes`
+3. Saves timestamp after successful sync
+4. Next job uses the saved timestamp
+
+**Important:** The `InitialStartTime` is only used on first run. After that, the system uses the saved timestamp from the database.
+
+For detailed sync configuration, see [SYNC-CONFIGURATION.md](./SYNC-CONFIGURATION.md)
 
 ### SSE Update Frequency
 SSE checks for updates every 3 seconds. To adjust:
@@ -169,13 +204,19 @@ await Task.Delay(3000, HttpContext.RequestAborted);
 
 ## 📡 API Endpoints
 
-### REST API
+### Dashboard API
 - `GET /api/dashboard/stats?area={area}` - Get KPI statistics
 - `GET /api/dashboard/active-alerts?area={area}&location={location}` - Get active alerts
 - `GET /api/dashboard/area-distribution?area={area}` - Get area distribution
 - `GET /api/dashboard/recurrent-units?area={area}` - Get recurrent units
 - `GET /api/dashboard/high-risk-areas?area={area}` - Get high-risk areas
 - `GET /api/dashboard/delayed-alerts?area={area}` - Get delayed alerts (>30 min)
+
+### Sync Management API
+- `GET /api/sync/status` - Get current sync status and metadata
+- `POST /api/sync/update-sync-time` - Update sync time manually
+- `POST /api/sync/reset` - Reset sync to start from specific date
+- `GET /api/sync/statistics` - Get sync statistics and event counts
 
 ### SSE Endpoint
 - `GET /api/sse/stream` - Server-Sent Events stream
