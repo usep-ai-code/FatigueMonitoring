@@ -99,6 +99,7 @@ public sealed class DashboardDbContext(DbContextOptions<DashboardDbContext> opti
         modelBuilder.Entity<AiDeviceHealth>(entity =>
         {
             entity.ToTable("AI_DeviceHealth_T");
+            entity.Property(e => e.Coverage).HasColumnType("decimal(18,2)");
         });
 
         modelBuilder.Entity<AiProcessingState>(entity =>
