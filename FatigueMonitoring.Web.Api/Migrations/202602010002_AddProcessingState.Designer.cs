@@ -3,15 +3,17 @@ using FatigueMonitoring.Web.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace FatigueMonitoring.Web.Api.Migrations;
 
 [DbContext(typeof(DashboardDbContext))]
-public partial class DashboardDbContextModelSnapshot : ModelSnapshot
+[Migration("202602010002_AddProcessingState")]
+public partial class AddProcessingState
 {
-    protected override void BuildModel(ModelBuilder modelBuilder)
+    protected override void BuildTargetModel(ModelBuilder modelBuilder)
     {
         modelBuilder
             .HasAnnotation("ProductVersion", "10.0.2")

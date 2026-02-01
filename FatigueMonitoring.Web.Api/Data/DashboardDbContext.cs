@@ -13,6 +13,7 @@ public sealed class DashboardDbContext(DbContextOptions<DashboardDbContext> opti
     public DbSet<AiRecurrentUnit> AiRecurrentUnits => Set<AiRecurrentUnit>();
     public DbSet<AiHighRiskArea> AiHighRiskAreas => Set<AiHighRiskArea>();
     public DbSet<AiDeviceHealth> AiDeviceHealth => Set<AiDeviceHealth>();
+    public DbSet<AiProcessingState> AiProcessingStates => Set<AiProcessingState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,6 +99,11 @@ public sealed class DashboardDbContext(DbContextOptions<DashboardDbContext> opti
         modelBuilder.Entity<AiDeviceHealth>(entity =>
         {
             entity.ToTable("AI_DeviceHealth_T");
+        });
+
+        modelBuilder.Entity<AiProcessingState>(entity =>
+        {
+            entity.ToTable("AI_ProcessingState_T");
         });
     }
 }

@@ -39,8 +39,20 @@ public sealed class AggregationWorker(
     private async Task RunAggregationAsync(CancellationToken cancellationToken)
     {
         var nowLocal = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, JakartaTimeZone);
-        var rangeStart = nowLocal.LocalDateTime.AddHours(-_options.RangeHours);
-        var rangeEnd = nowLocal.LocalDateTime;
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DashboardDbContext>();
+
+        var processingState = await GetProcessingStateAsync(dbContext, nowLocal.LocalDateTime, cancellationToken);
+        var rangeStart = processingState.LastProcessedAt;
+        var rangeEnd = rangeStart.AddMinutes(_options.FetchWindowMinutes);
+        if (rangeEnd > nowLocal.LocalDateTime)
+        {
+            logger.LogInformation(
+                "Skipping external fetch because next window ends in the future. RangeStart: {RangeStart}, Now: {NowLocal}",
+                rangeStart,
+                nowLocal.LocalDateTime);
+            return;
+        }
 
         IReadOnlyList<ExternalEventDto> events;
         try
@@ -53,16 +65,21 @@ public sealed class AggregationWorker(
             return;
         }
 
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DashboardDbContext>();
-
         var mappedEvents = events
             .Where(e => !string.IsNullOrWhiteSpace(e.ExternalId))
             .Select(MapExternalEvent)
             .ToList();
 
         await UpsertRawEventsAsync(dbContext, mappedEvents, cancellationToken);
-        await UpdateAggregateTablesAsync(dbContext, mappedEvents, nowLocal.LocalDateTime, cancellationToken);
+
+        var aggregationEvents = await LoadAggregationEventsAsync(dbContext, nowLocal.LocalDateTime, cancellationToken);
+        await UpdateAggregateTablesAsync(
+            dbContext,
+            aggregationEvents,
+            nowLocal.LocalDateTime,
+            processingState,
+            rangeEnd,
+            cancellationToken);
     }
 
     private static async Task UpsertRawEventsAsync(
@@ -119,10 +136,91 @@ public sealed class AggregationWorker(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    private async Task<AiProcessingState> GetProcessingStateAsync(
+        DashboardDbContext dbContext,
+        DateTime nowLocal,
+        CancellationToken cancellationToken)
+    {
+        var state = await dbContext.AiProcessingStates.SingleOrDefaultAsync(cancellationToken);
+        if (state is not null)
+        {
+            if (state.LastProcessedAt > nowLocal)
+            {
+                var fallback = nowLocal.AddMinutes(-_options.FetchWindowMinutes);
+                logger.LogWarning(
+                    "Processing state is ahead of current time. Resetting from {LastProcessedAt} to {Fallback}.",
+                    state.LastProcessedAt,
+                    fallback);
+                state.LastProcessedAt = fallback;
+                state.UpdatedAt = nowLocal;
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            return state;
+        }
+
+        var initialStart = ParseInitialStartTime(nowLocal);
+        state = new AiProcessingState
+        {
+            LastProcessedAt = initialStart,
+            UpdatedAt = nowLocal
+        };
+        dbContext.AiProcessingStates.Add(state);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return state;
+    }
+
+    private DateTime ParseInitialStartTime(DateTime nowLocal)
+    {
+        var value = _options.InitialStartTime;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return nowLocal.AddMinutes(-_options.FetchWindowMinutes);
+        }
+
+        if (DateTime.TryParseExact(
+                value,
+                "yyyy-MM-dd HH:mm:ss",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed) ||
+            DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+        {
+            if (parsed > nowLocal)
+            {
+                logger.LogWarning(
+                    "InitialStartTime is in the future ({InitialStartTime}). Using fallback window.",
+                    parsed);
+                return nowLocal.AddMinutes(-_options.FetchWindowMinutes);
+            }
+
+            return parsed;
+        }
+
+        logger.LogWarning(
+            "Unable to parse InitialStartTime value: {InitialStartTime}. Using fallback window.",
+            value);
+        return nowLocal.AddMinutes(-_options.FetchWindowMinutes);
+    }
+
+    private async Task<List<ExternalEvent>> LoadAggregationEventsAsync(
+        DashboardDbContext dbContext,
+        DateTime snapshotAt,
+        CancellationToken cancellationToken)
+    {
+        var rangeStart = snapshotAt.AddHours(-_options.AggregationRangeHours);
+        return await dbContext.ExternalEvents
+            .AsNoTracking()
+            .Where(e => e.DeviceTime == null || e.DeviceTime >= rangeStart)
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task UpdateAggregateTablesAsync(
         DashboardDbContext dbContext,
         IReadOnlyList<ExternalEvent> events,
         DateTime snapshotAt,
+        AiProcessingState processingState,
+        DateTime rangeEnd,
         CancellationToken cancellationToken)
     {
         var activeEvents = events.Where(e => !e.IsFollowedUp).ToList();
@@ -179,6 +277,9 @@ public sealed class AggregationWorker(
         {
             dbContext.AiDeviceHealth.Add(deviceHealth);
         }
+
+        processingState.LastProcessedAt = rangeEnd;
+        processingState.UpdatedAt = snapshotAt;
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
