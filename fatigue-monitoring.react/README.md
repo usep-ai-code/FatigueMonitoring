@@ -1,16 +1,66 @@
-# React + Vite
+# Fatigue Monitoring React Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Real-time fatigue monitoring dashboard built with React and Vite.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Real-time Updates**: Uses Server-Sent Events (SSE) for live data streaming
+- **SSE Connection Status**: Visual indicator showing connection state
+  - 🟢 Green - Connected
+  - 🟡 Yellow - Connecting
+  - 🔴 Red - Disconnected
+- **Dark/Light Mode**: Toggle between themes
+- **Responsive Design**: Optimized for command center displays
+- **Notification Pop-ups**: Alerts for new fatigue events
 
-## React Compiler
+## Quick Start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install dependencies
+npm install
 
-## Expanding the ESLint configuration
+# Create environment file
+cp .env.example .env
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+# Start development server
+npm run dev
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VITE_API_URL` | Backend API URL | `https://localhost:7001` |
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── SCCDashboard.jsx    # Main dashboard component
+│   └── SseStatusIndicator.jsx  # SSE connection indicator
+├── hooks/
+│   └── useSse.js           # SSE connection hook
+├── services/
+│   └── config.js           # API configuration
+├── types/
+│   └── dashboard.js        # Type definitions
+├── App.jsx
+├── main.jsx
+└── index.css
+```
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+Output will be in `dist/` folder.
+
+## Technology Stack
+
+- React 19
+- Vite 7
+- Tailwind CSS 3
+- Lucide React Icons
