@@ -10,6 +10,15 @@ public sealed record DashboardSnapshotDto(
     IReadOnlyList<HighRiskAreaDto> HighRiskAreas,
     DeviceHealthDto? DeviceHealth);
 
+public sealed record DashboardStatusDto(
+    DateTime? LastProcessedAt,
+    DateTime? LastAggregationAt,
+    DateTime? LastSnapshotAt,
+    int ActiveAlerts,
+    int DelayedAlerts,
+    int TotalAlerts,
+    int FollowedUpAlerts);
+
 public sealed record KpiDto(
     string Area,
     int TotalAlarms,

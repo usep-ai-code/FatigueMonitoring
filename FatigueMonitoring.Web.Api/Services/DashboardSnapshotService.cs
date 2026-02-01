@@ -97,4 +97,34 @@ public sealed class DashboardSnapshotService(DashboardDbContext dbContext)
                     deviceHealth.OfflineDevices,
                     deviceHealth.Coverage));
     }
+
+    public async Task<DashboardStatusDto> GetStatusAsync(CancellationToken cancellationToken)
+    {
+        var processingState = await dbContext.AiProcessingStates
+            .AsNoTracking()
+            .OrderByDescending(state => state.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var latestSnapshotAt = await dbContext.AiKpis
+            .AsNoTracking()
+            .OrderByDescending(kpi => kpi.SnapshotAt)
+            .Select(kpi => (DateTime?)kpi.SnapshotAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var totalAlerts = await dbContext.AiActiveAlerts.CountAsync(cancellationToken);
+        var delayedAlerts = await dbContext.AiDelayedAlerts.CountAsync(cancellationToken);
+
+        var allKpi = await dbContext.AiKpis
+            .AsNoTracking()
+            .FirstOrDefaultAsync(kpi => kpi.Area == "All", cancellationToken);
+
+        return new DashboardStatusDto(
+            processingState?.LastProcessedAt,
+            processingState?.UpdatedAt,
+            latestSnapshotAt,
+            totalAlerts,
+            delayedAlerts,
+            allKpi?.TotalAlarms ?? 0,
+            allKpi?.FollowedUp ?? 0);
+    }
 }

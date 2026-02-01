@@ -26,6 +26,13 @@ public sealed class DashboardController(
         return Ok(snapshot);
     }
 
+    [HttpGet("status")]
+    public async Task<ActionResult<DashboardStatusDto>> GetStatus(CancellationToken cancellationToken)
+    {
+        var status = await snapshotService.GetStatusAsync(cancellationToken);
+        return Ok(status);
+    }
+
     [HttpGet("stream")]
     public async Task Stream(CancellationToken cancellationToken)
     {
@@ -34,6 +41,7 @@ public sealed class DashboardController(
         Response.Headers.Append("Connection", "keep-alive");
         Response.Headers.Append("X-Accel-Buffering", "no");
 
+        await Response.WriteAsync("retry: 10000\n\n", cancellationToken);
         await Response.Body.FlushAsync(cancellationToken);
 
         var heartbeatInterval = TimeSpan.FromSeconds(sseOptions.Value.HeartbeatSeconds);

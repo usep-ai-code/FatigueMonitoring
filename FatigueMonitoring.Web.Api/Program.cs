@@ -3,6 +3,7 @@ using FatigueMonitoring.Web.Api.Data;
 using FatigueMonitoring.Web.Api.Options;
 using FatigueMonitoring.Web.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,7 +14,15 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
     });
 
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Fatigue Monitoring API",
+        Version = "v1"
+    });
+});
 
 builder.Services.Configure<ExternalApiOptions>(
     builder.Configuration.GetSection(ExternalApiOptions.SectionName));
@@ -69,10 +78,12 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.Migrate();
 }
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.MapOpenApi();
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Fatigue Monitoring API v1");
+    options.RoutePrefix = "swagger";
+});
 
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
