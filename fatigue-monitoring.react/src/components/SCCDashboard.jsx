@@ -147,7 +147,7 @@ const SCCDashboard = () => {
   const processTimeoutRef = useRef(null);
 
   // Stagger delay constants (milliseconds)
-  const NOTIFICATION_STAGGER_DELAY = 400; // Delay between showing each notification
+  const NOTIFICATION_STAGGER_DELAY = 200; // Delay between showing each notification
   const NOTIFICATION_AUTO_CLOSE_DELAY = 4000; // How long notification stays visible
 
   // Process notification queue - show one by one with stagger
