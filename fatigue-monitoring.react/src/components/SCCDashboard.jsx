@@ -141,22 +141,61 @@ const SCCDashboard = () => {
     setHighRiskPage(1);
   }, [selectedArea, selectedLocationFilter]);
 
-  // Notification helper
+  // Notification queue ref for staggered display
+  const notificationQueueRef = useRef([]);
+  const isProcessingQueueRef = useRef(false);
+
+  // Stagger delay constants (milliseconds)
+  const NOTIFICATION_STAGGER_DELAY = 300; // Delay between showing each notification
+  const NOTIFICATION_AUTO_CLOSE_DELAY = 4000; // How long notification stays visible
+  const NOTIFICATION_CLOSE_STAGGER_DELAY = 200; // Delay between closing each notification
+
+  // Process notification queue - show one by one with stagger
+  const processNotificationQueue = useCallback(() => {
+    if (isProcessingQueueRef.current || notificationQueueRef.current.length === 0) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+
+    const processNext = () => {
+      if (notificationQueueRef.current.length === 0) {
+        isProcessingQueueRef.current = false;
+        return;
+      }
+
+      const nextNotif = notificationQueueRef.current.shift();
+      setNotifications(prev => [nextNotif, ...prev]);
+
+      // Schedule auto-close with stagger based on current queue position
+      setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== nextNotif.id));
+      }, NOTIFICATION_AUTO_CLOSE_DELAY);
+
+      // Process next notification after stagger delay
+      if (notificationQueueRef.current.length > 0) {
+        setTimeout(processNext, NOTIFICATION_STAGGER_DELAY);
+      } else {
+        isProcessingQueueRef.current = false;
+      }
+    };
+
+    processNext();
+  }, []);
+
+  // Add notification to queue
   const addNotification = useCallback((title, message, type = 'critical') => {
     const id = Date.now() + Math.random();
     const newNotif = { id, title, message, type };
-    setNotifications(prev => [newNotif, ...prev]);
-    // Auto-close after 4 seconds
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 4000); 
-  }, []);
+    notificationQueueRef.current.push(newNotif);
+    processNotificationQueue();
+  }, [processNotificationQueue]);
 
   const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
-  // Detect new alerts and show notifications
+  // Detect new alerts and show notifications (staggered)
   useEffect(() => {
     if (sseData?.activeAlerts) {
       const currentIds = new Set(sseData.activeAlerts.map(a => a.externalId));
@@ -165,7 +204,7 @@ const SCCDashboard = () => {
       // Find new alerts
       const newAlerts = sseData.activeAlerts.filter(a => !prevIds.has(a.externalId));
       
-      // Show notification for each new alert
+      // Queue notifications for each new alert (will be shown with stagger)
       newAlerts.forEach(alert => {
         addNotification(
           'New Fatigue Alert!',
