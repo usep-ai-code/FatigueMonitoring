@@ -7,9 +7,10 @@ A real-time fatigue monitoring dashboard for mining and hauling operations. This
 ### Stack
 
 **Backend:**
-- ASP.NET Core (.NET 9)
-- Entity Framework Core
+- ASP.NET Core (.NET 10)
+- Entity Framework Core 10
 - SQL Server
+- Serilog (Structured Logging)
 - Server-Sent Events (SSE)
 - Background Jobs for data aggregation
 
@@ -278,22 +279,40 @@ The application determines whether a unit belongs to Mining or Hauling based on:
 
 You can adjust this logic in `DataAggregationService.cs` > `DetermineArea()` method.
 
+## 📋 Logging
+
+The application uses **Serilog** for structured logging with the following features:
+- Console output with colored levels
+- File logging with daily rotation (7 days retention)
+- Request logging for all HTTP requests
+- Structured logging for easy searching and filtering
+
+**Log locations:**
+- Production: `logs/fatigue-monitoring-YYYYMMDD.log`
+- Development: `logs/dev-YYYYMMDD.log`
+
+For detailed logging configuration, see [SERILOG-CONFIGURATION.md](./SERILOG-CONFIGURATION.md)
+
 ## 🐛 Troubleshooting
 
 ### SSE Connection Issues
 - Check CORS configuration
 - Verify API is running and accessible
 - Check browser console for errors
+- Check logs in `logs/` folder
 - Ensure firewall allows SSE connections
 
 ### Background Job Not Running
-- Check logs for errors
+- Check logs in `logs/` folder for errors
 - Verify External API credentials
 - Check rate limiting (1 login per minute)
+- Ensure Always On is enabled in Azure
 
 ### No Data Showing
 - Verify database migrations are applied
 - Check if background job has run at least once
+- Check sync status: `GET /api/sync/status`
+- Review logs for errors
 - Verify External API is returning data
 
 ## 📄 License
