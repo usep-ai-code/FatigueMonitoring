@@ -146,14 +146,15 @@ const SCCDashboard = () => {
     const id = Date.now() + Math.random();
     const newNotif = { id, title, message, type };
     setNotifications(prev => [newNotif, ...prev]);
+    // Auto-close after 4 seconds
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 8000); 
+    }, 4000); 
   }, []);
 
-  const removeNotification = (id) => {
+  const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, []);
 
   // Detect new alerts and show notifications
   useEffect(() => {
@@ -335,7 +336,15 @@ const SCCDashboard = () => {
               <h4 className="font-bold text-xl truncate">{notif.title}</h4>
               <p className={`text-lg mt-1 break-words leading-snug ${darkMode ? 'text-slate-200' : 'opacity-80'}`}>{notif.message}</p>
             </div>
-            <button onClick={() => removeNotification(notif.id)} className="text-slate-500 hover:text-red-500 shrink-0">
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                removeNotification(notif.id);
+              }} 
+              className="text-slate-500 hover:text-red-500 shrink-0 cursor-pointer pointer-events-auto p-1 rounded-full hover:bg-slate-700/50 transition-colors"
+            >
               <X size={28} />
             </button>
           </div>
