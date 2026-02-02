@@ -349,7 +349,8 @@ public class DataAggregationService(
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FatigueMonitoringDbContext>();
 
-        var now = DateTime.UtcNow;
+        // Use WITA time (GMT+8) since EventTime is stored in WITA
+        var now = DateTime.UtcNow.AddHours(8);
         var todayStart = now.Date;
 
         // Get all events for today

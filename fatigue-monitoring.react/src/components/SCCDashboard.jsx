@@ -323,12 +323,37 @@ const SCCDashboard = () => {
         const dynamicDuration = (() => {
           if (!alert.eventTime) return 0;
           try {
-            const eventDate = new Date(alert.eventTime);
-            if (isNaN(eventDate.getTime())) return 0;
+            // EventTime from backend is in WITA (no timezone info)
+            // Parse it and treat as WITA time
+            let eventDate;
+            const eventTimeStr = alert.eventTime;
+            
+            if (typeof eventTimeStr === 'string') {
+              // Handle ISO format from JSON (e.g., "2026-02-01T09:11:58")
+              // This is WITA time, so we need to parse it correctly
+              // Remove any Z suffix and parse as local
+              const cleanStr = eventTimeStr.replace('Z', '').replace('T', ' ');
+              const parts = cleanStr.split(/[-: ]/);
+              if (parts.length >= 6) {
+                // Create date from parts (year, month-1, day, hour, min, sec)
+                eventDate = new Date(
+                  parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
+                  parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5])
+                );
+              } else {
+                eventDate = new Date(eventTimeStr);
+              }
+            } else {
+              eventDate = new Date(eventTimeStr);
+            }
+            
+            if (isNaN(eventDate.getTime())) return alert.openDurationMinutes || 0;
+            
+            // currentTime is already in WITA, eventDate is now also treated as WITA
             const diffMs = currentTime.getTime() - eventDate.getTime();
             return Math.max(0, Math.floor(diffMs / (1000 * 60)));
           } catch {
-            return 0;
+            return alert.openDurationMinutes || 0;
           }
         })();
         
