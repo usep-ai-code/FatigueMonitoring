@@ -317,23 +317,40 @@ const SCCDashboard = () => {
   const filteredAlerts = useMemo(() => {
     if (!sseData?.activeAlerts) return [];
     
-    return sseData.activeAlerts.filter(alert => {
-      // Must be Open status AND less than or equal to 30 minutes
-      const isOpen = alert.status === 'Open';
-      const isUnder30Min = (alert.openDurationMinutes || 0) <= 30;
-      
-      if (!isOpen || !isUnder30Min) return false;
-      
-      // Apply location filter if set
-      if (selectedLocationFilter) {
-        return alert.location === selectedLocationFilter;
-      }
-      
-      // Apply area filter
-      const areaMatch = selectedArea === 'All' || alert.area === selectedArea;
-      return areaMatch;
-    });
-  }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter]);
+    return sseData.activeAlerts
+      .map(alert => {
+        // Calculate dynamic duration based on current WITA time
+        const dynamicDuration = (() => {
+          if (!alert.eventTime) return 0;
+          try {
+            const eventDate = new Date(alert.eventTime);
+            if (isNaN(eventDate.getTime())) return 0;
+            const diffMs = currentTime.getTime() - eventDate.getTime();
+            return Math.max(0, Math.floor(diffMs / (1000 * 60)));
+          } catch {
+            return 0;
+          }
+        })();
+        
+        return { ...alert, dynamicDurationMinutes: dynamicDuration };
+      })
+      .filter(alert => {
+        // Must be Open status AND less than or equal to 30 minutes
+        const isOpen = alert.status === 'Open';
+        const isUnder30Min = alert.dynamicDurationMinutes <= 30;
+        
+        if (!isOpen || !isUnder30Min) return false;
+        
+        // Apply location filter if set
+        if (selectedLocationFilter) {
+          return alert.location === selectedLocationFilter;
+        }
+        
+        // Apply area filter
+        const areaMatch = selectedArea === 'All' || alert.area === selectedArea;
+        return areaMatch;
+      });
+  }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter, currentTime]);
 
   const overdueAlerts = useMemo(() => {
     if (!sseData?.delayedFollowUps) return [];
@@ -882,7 +899,7 @@ const SCCDashboard = () => {
                       </div>
                       <div className={`text-[1rem] p-2 rounded-lg flex justify-between items-center ${darkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                         <div className={`flex items-center gap-2 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}><Map size={18} /><span>{alert.location}</span></div>
-                        <div className="flex items-center gap-2 text-red-400 font-mono font-bold animate-pulse"><Clock size={18} /><span>+{alert.openDurationMinutes}m</span></div>
+                        <div className="flex items-center gap-2 text-red-400 font-mono font-bold animate-pulse"><Clock size={18} /><span>+{alert.dynamicDurationMinutes}m</span></div>
                       </div>
                     </div>
                   ))
