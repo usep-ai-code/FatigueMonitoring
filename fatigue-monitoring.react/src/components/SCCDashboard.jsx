@@ -236,9 +236,18 @@ const SCCDashboard = () => {
     }
   }, [sseData?.activeAlerts, addNotification]);
 
-  // Clock update
+  // Clock update - WITA (GMT+8)
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const updateWitaTime = () => {
+      // Get current UTC time and add 8 hours for WITA
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const wita = new Date(utc + (8 * 60 * 60 * 1000)); // GMT+8
+      setCurrentTime(wita);
+    };
+    
+    updateWitaTime(); // Initial update
+    const timer = setInterval(updateWitaTime, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -574,7 +583,7 @@ const SCCDashboard = () => {
 
           <div className={`flex flex-col items-end ${darkMode ? 'text-white' : 'text-slate-600'}`}>
             <span className="text-[clamp(1.8rem,3vh,3.5rem)] font-mono font-bold leading-none">
-              {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
+              {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WITA
             </span>
             <span className={`text-[clamp(0.9rem,1.2vh,1.3rem)] font-medium uppercase tracking-wider mt-1 ${darkMode ? 'text-slate-300' : ''}`}>
               {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
