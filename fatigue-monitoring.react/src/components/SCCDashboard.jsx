@@ -309,12 +309,20 @@ const SCCDashboard = () => {
     if (!sseData?.activeAlerts) return [];
     
     return sseData.activeAlerts.filter(alert => {
+      // Must be Open status AND less than 30 minutes
+      const isOpen = alert.status === 'Open';
+      const isUnder30Min = (alert.openDurationMinutes || 0) < 30;
+      
+      if (!isOpen || !isUnder30Min) return false;
+      
+      // Apply location filter if set
       if (selectedLocationFilter) {
-        return alert.location === selectedLocationFilter && alert.status === 'Open';
+        return alert.location === selectedLocationFilter;
       }
+      
+      // Apply area filter
       const areaMatch = selectedArea === 'All' || alert.area === selectedArea;
-      const statusMatch = alert.status === 'Open';
-      return areaMatch && statusMatch;
+      return areaMatch;
     });
   }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter]);
 
@@ -836,7 +844,7 @@ const SCCDashboard = () => {
                 </div>
                 <span className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-600'}`}>{filteredAlerts.length} Total</span>
               </div>
-              <div className={`flex justify-between items-center text-[1rem] ${darkMode ? 'text-slate-300' : 'opacity-60'}`}><span>Recent Alerts</span><span className="text-red-500 font-bold">OPEN ONLY</span></div>
+              <div className={`flex justify-between items-center text-[1rem] ${darkMode ? 'text-slate-300' : 'opacity-60'}`}><span>Recent Alerts</span><span className="text-red-500 font-bold">OPEN &lt; 30m</span></div>
             </div>
 
             <div className="flex-1 flex flex-col justify-between overflow-hidden p-[2vh]" ref={activeFatigueListContainerRef}>
