@@ -1,6 +1,7 @@
 using FatigueMonitoring.Web.Api.Data;
 using FatigueMonitoring.Web.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
 
 // Configure Serilog bootstrap logger
@@ -57,6 +58,8 @@ try
                 errorNumbersToAdd: null
             )
         )
+        .ConfigureWarnings(warnings => warnings
+            .Ignore(RelationalEventId.PendingModelChangesWarning))
     );
 
     // Configure External API Settings
