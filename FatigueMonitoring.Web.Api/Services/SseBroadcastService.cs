@@ -8,7 +8,7 @@ namespace FatigueMonitoring.Web.Api.Services;
 /// </summary>
 public class SseBroadcastService(
     ISseConnectionManager connectionManager,
-    IDataAggregationService aggregationService,
+    IServiceScopeFactory scopeFactory,
     IOptions<BackgroundJobSettings> settings,
     ILogger<SseBroadcastService> logger) : BackgroundService
 {
@@ -69,6 +69,10 @@ public class SseBroadcastService(
     {
         try
         {
+            // Create a scope to resolve scoped services
+            using var scope = scopeFactory.CreateScope();
+            var aggregationService = scope.ServiceProvider.GetRequiredService<IDataAggregationService>();
+            
             var data = await aggregationService.GetDashboardDataAsync("All", cancellationToken);
             
             var eventData = new SseEventDto(

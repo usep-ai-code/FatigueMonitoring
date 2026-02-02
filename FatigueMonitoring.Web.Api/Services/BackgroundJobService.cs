@@ -26,7 +26,7 @@ public class BackgroundJobSettings
 }
 
 public class BackgroundJobService(
-    IDataAggregationService aggregationService,
+    IServiceScopeFactory scopeFactory,
     IOptions<BackgroundJobSettings> settings,
     ILogger<BackgroundJobService> logger) : BackgroundService
 {
@@ -45,6 +45,10 @@ public class BackgroundJobService(
             try
             {
                 logger.LogInformation("Starting data fetch and aggregation cycle");
+
+                // Create a scope to resolve scoped services
+                using var scope = scopeFactory.CreateScope();
+                var aggregationService = scope.ServiceProvider.GetRequiredService<IDataAggregationService>();
 
                 // Step 1: Fetch data from external API
                 await aggregationService.FetchAndProcessEventsAsync(stoppingToken);
