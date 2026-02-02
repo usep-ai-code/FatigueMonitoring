@@ -326,7 +326,7 @@ public class DataAggregationService(
         return (area, location);
     }
 
-    private static DateTime ParseDateTime(string dateString)
+    private static DateTime ParseDateTime(string? dateString)
     {
         if (string.IsNullOrEmpty(dateString))
             return DateTime.UtcNow;
