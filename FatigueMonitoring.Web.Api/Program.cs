@@ -2,6 +2,7 @@ using FatigueMonitoring.Web.Api.Data;
 using FatigueMonitoring.Web.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Scalar.AspNetCore;
 using Serilog;
 
 // Configure Serilog bootstrap logger
@@ -31,10 +32,6 @@ try
     // Add services to the container
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
-    
-    // Add Swagger for API testing
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
 
     // Configure CORS for React frontend
     builder.Services.AddCors(options =>
@@ -94,18 +91,13 @@ try
     var app = builder.Build();
 
     // Configure the HTTP request pipeline
-    // Enable Swagger in all environments for testing
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
+    // Enable OpenAPI and Scalar UI for API testing
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Fatigue Monitoring API v1");
-        options.RoutePrefix = "swagger"; // Access at /swagger
+        options.WithTitle("Fatigue Monitoring API");
+        options.WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient);
     });
-    
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapOpenApi();
-    }
 
     // Add Serilog request logging
     app.UseSerilogRequestLogging(options =>
@@ -139,7 +131,8 @@ try
             Log.Information("  → {Address}", address);
         }
         Log.Information("========================================");
-        Log.Information("Swagger UI: {SwaggerUrl}", $"{addresses.FirstOrDefault()}/swagger");
+        Log.Information("Scalar API Docs: {ScalarUrl}", $"{addresses.FirstOrDefault()}/scalar/v1");
+        Log.Information("OpenAPI JSON: {OpenApiUrl}", $"{addresses.FirstOrDefault()}/openapi/v1.json");
         Log.Information("Dashboard API: {ApiUrl}", $"{addresses.FirstOrDefault()}/api/dashboard");
         Log.Information("SSE Stream: {SseUrl}", $"{addresses.FirstOrDefault()}/api/dashboard/stream");
         Log.Information("========================================");
