@@ -248,12 +248,30 @@ const SCCDashboard = () => {
       return { totalToday: 0, followedUpToday: 0, activeOpen: 0 };
     }
     
+    // Apply global filter
+    if (selectedArea === 'All') {
+      return {
+        totalToday: sseData.summary.totalAlarms,
+        followedUpToday: sseData.summary.followedUp,
+        activeOpen: sseData.summary.waitingFollowUp
+      };
+    }
+    
+    // Filter by selected area (Mining or Hauling)
+    const areaData = selectedArea === 'Mining' 
+      ? sseData.areaSummary?.mining 
+      : sseData.areaSummary?.hauling;
+    
+    if (!areaData) {
+      return { totalToday: 0, followedUpToday: 0, activeOpen: 0 };
+    }
+    
     return {
-      totalToday: sseData.summary.totalAlarms,
-      followedUpToday: sseData.summary.followedUp,
-      activeOpen: sseData.summary.waitingFollowUp
+      totalToday: areaData.total || 0,
+      followedUpToday: areaData.resolved || 0,
+      activeOpen: areaData.open || 0
     };
-  }, [sseData?.summary]);
+  }, [sseData?.summary, sseData?.areaSummary, selectedArea]);
 
   const areaSummary = useMemo(() => {
     if (!sseData?.areaSummary) {
