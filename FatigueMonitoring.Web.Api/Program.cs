@@ -34,15 +34,7 @@ try
     
     // Add Swagger for API testing
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(options =>
-    {
-        options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-        {
-            Title = "Fatigue Monitoring API",
-            Version = "v1",
-            Description = "API for Fatigue Monitoring Dashboard with SSE real-time updates"
-        });
-    });
+    builder.Services.AddSwaggerGen();
 
     // Configure CORS for React frontend
     builder.Services.AddCors(options =>
