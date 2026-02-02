@@ -31,6 +31,18 @@ try
     // Add services to the container
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
+    
+    // Add Swagger for API testing
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Title = "Fatigue Monitoring API",
+            Version = "v1",
+            Description = "API for Fatigue Monitoring Dashboard with SSE real-time updates"
+        });
+    });
 
     // Configure CORS for React frontend
     builder.Services.AddCors(options =>
@@ -90,6 +102,14 @@ try
     var app = builder.Build();
 
     // Configure the HTTP request pipeline
+    // Enable Swagger in all environments for testing
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Fatigue Monitoring API v1");
+        options.RoutePrefix = "swagger"; // Access at /swagger
+    });
+    
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
