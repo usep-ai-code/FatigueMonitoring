@@ -51,9 +51,8 @@ public class DataAggregationService(
             {
                 // First sync: fetch from InitialStartTime to NOW
                 endDate = nowWib;
-                logger.LogInformation("First sync detected. Fetching all data from {StartDate} to {EndDate} (WIB)",
-                    startDate.ToString("yyyy-MM-dd HH:mm:ss"),
-                    endDate.ToString("yyyy-MM-dd HH:mm:ss"));
+                logger.LogInformation("First sync detected. Fetching all data from {StartDate:yyyy-MM-dd HH:mm:ss} to {EndDate:yyyy-MM-dd HH:mm:ss} (WIB)",
+                    startDate, endDate);
             }
             else
             {
@@ -78,9 +77,8 @@ public class DataAggregationService(
                 return;
             }
 
-            logger.LogInformation("Fetching events from {StartDate} to {EndDate} (WIB)", 
-                startDate.ToString("yyyy-MM-dd HH:mm:ss"), 
-                endDate.ToString("yyyy-MM-dd HH:mm:ss"));
+            logger.LogInformation("Fetching events from {StartDate:yyyy-MM-dd HH:mm:ss} to {EndDate:yyyy-MM-dd HH:mm:ss} (WIB)", 
+                startDate, endDate);
 
             // Get all true alarms in the time window
             var allEvents = new List<EventData>();
@@ -110,8 +108,8 @@ public class DataAggregationService(
                 }
             } while (page <= totalPages && page <= 20); // Limit to 20 pages max
 
-            logger.LogInformation("Fetched {Count} events from external API for period {StartDate} to {EndDate}", 
-                allEvents.Count, startDate.ToString("yyyy-MM-dd HH:mm:ss"), endDate.ToString("yyyy-MM-dd HH:mm:ss"));
+            logger.LogInformation("Fetched {Count} events from external API for period {StartDate:yyyy-MM-dd HH:mm:ss} to {EndDate:yyyy-MM-dd HH:mm:ss}", 
+                allEvents.Count, startDate, endDate);
 
             // Process and store events
             foreach (var eventData in allEvents)
@@ -127,8 +125,8 @@ public class DataAggregationService(
             syncState.UpdatedAt = DateTime.UtcNow;
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Successfully processed {Count} events. Next sync will start from {NextStart}", 
-                allEvents.Count, endDate.ToString("yyyy-MM-dd HH:mm:ss"));
+            logger.LogInformation("Successfully processed {Count} events. Next sync will start from {NextStart:yyyy-MM-dd HH:mm:ss}", 
+                allEvents.Count, endDate);
         }
         catch (Exception ex)
         {
@@ -176,8 +174,8 @@ public class DataAggregationService(
             {
                 // Default to 24 hours ago if parsing fails
                 initialStartTime = DateTime.UtcNow.AddHours(7).AddHours(-24); // WIB
-                logger.LogWarning("Failed to parse InitialStartTime '{InitialStartTime}', using default: {DefaultTime}",
-                    _jobSettings.InitialStartTime, initialStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                logger.LogWarning("Failed to parse InitialStartTime '{InitialStartTime}', using default: {DefaultTime:yyyy-MM-dd HH:mm:ss}",
+                    _jobSettings.InitialStartTime, initialStartTime);
             }
 
             syncState = new AI_SyncState_T
@@ -193,8 +191,8 @@ public class DataAggregationService(
             dbContext.SyncStates.Add(syncState);
             await dbContext.SaveChangesAsync(cancellationToken);
             
-            logger.LogInformation("Created new sync state with initial start time: {InitialStartTime}", 
-                initialStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
+            logger.LogInformation("Created new sync state with initial start time: {InitialStartTime:yyyy-MM-dd HH:mm:ss}", 
+                initialStartTime);
         }
 
         return (syncState, isFirstSync);
