@@ -114,32 +114,6 @@ try
 
     app.MapControllers();
 
-    // Apply database migrations on startup
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<FatigueMonitoringDbContext>();
-        
-        try
-        {
-            Log.Information("Applying database migrations...");
-            await dbContext.Database.MigrateAsync();
-            Log.Information("Database migrations applied successfully");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Error applying database migrations. Attempting to ensure database is created...");
-            try
-            {
-                await dbContext.Database.EnsureCreatedAsync();
-                Log.Information("Database created/ensured successfully");
-            }
-            catch (Exception innerEx)
-            {
-                Log.Error(innerEx, "Failed to ensure database creation");
-            }
-        }
-    }
-
     Log.Information("Application started. Listening for requests...");
     await app.RunAsync();
 }

@@ -237,20 +237,20 @@ public class DataAggregationService(
             {
                 Id = Guid.NewGuid(),
                 ExternalId = eventData.Id,
-                Identity = eventData.Identity,
-                AlarmName = eventData.Name,
-                AlarmType = eventData.AlarmType,
+                Identity = eventData.Identity ?? string.Empty,
+                AlarmName = eventData.Name ?? "Unknown",
+                AlarmType = eventData.AlarmType ?? string.Empty,
                 EventTime = ParseDateTime(eventData.Time),
                 ServerTime = ParseDateTime(eventData.ServerTime),
-                Shift = eventData.Shift,
+                Shift = eventData.Shift ?? string.Empty,
                 ShiftDate = ParseDateTime(eventData.ShiftDate),
-                Level = eventData.Level,
-                Speed = eventData.Speed,
+                Level = eventData.Level ?? 0,
+                Speed = eventData.Speed ?? 0,
                 IsFollowedUp = eventData.IsFollowedUp,
-                Latitude = eventData.Latitude,
-                Longitude = eventData.Longitude,
+                Latitude = eventData.Latitude ?? 0,
+                Longitude = eventData.Longitude ?? 0,
                 GeofenceId = eventData.GeofenceId,
-                DeviceId = eventData.DeviceId,
+                DeviceId = eventData.DeviceId ?? string.Empty,
                 DriverId = eventData.DriverId,
                 ManualVerificationBy = eventData.ManualVerificationBy,
                 ManualVerificationTime = string.IsNullOrEmpty(eventData.ManualVerificationTime) 
@@ -291,6 +291,8 @@ public class DataAggregationService(
     {
         var groupName = eventData.Device?.GroupName ?? string.Empty;
         var unitName = eventData.Device?.Name ?? string.Empty;
+        var latitude = eventData.Latitude ?? 0m;
+        var longitude = eventData.Longitude ?? 0m;
         
         // Determine area based on unit prefix or group name
         string area;
@@ -301,7 +303,7 @@ public class DataAggregationService(
         {
             area = "Hauling";
             // Generate KM location based on coordinates or use a default pattern
-            var kmValue = Math.Abs((int)(eventData.Longitude * 10) % 60);
+            var kmValue = Math.Abs((int)(longitude * 10) % 60);
             location = $"KM {kmValue}";
         }
         else if (unitName.StartsWith("D", StringComparison.OrdinalIgnoreCase) ||
@@ -311,13 +313,13 @@ public class DataAggregationService(
             area = "Mining";
             // Generate front/pit location based on coordinates
             var frontLetters = new[] { "A", "B", "C", "D" };
-            var frontIndex = Math.Abs((int)(eventData.Latitude * 10) % frontLetters.Length);
+            var frontIndex = Math.Abs((int)(latitude * 10) % frontLetters.Length);
             location = $"Front {frontLetters[frontIndex]}";
         }
         else
         {
             // Default assignment based on coordinates
-            area = eventData.Latitude < -2.2m ? "Hauling" : "Mining";
+            area = latitude < -2.2m ? "Hauling" : "Mining";
             location = area == "Mining" ? "Front A" : "KM 10";
         }
 
