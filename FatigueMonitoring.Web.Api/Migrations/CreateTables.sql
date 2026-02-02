@@ -122,10 +122,16 @@ BEGIN
         [ExternalId] NVARCHAR(MAX) NOT NULL,
         [UnitName] NVARCHAR(MAX) NOT NULL,
         [OperatorName] NVARCHAR(MAX) NOT NULL,
+        [AlertType] NVARCHAR(MAX) NOT NULL,
         [Area] NVARCHAR(MAX) NOT NULL,
         [Location] NVARCHAR(MAX) NOT NULL,
         [EventTime] DATETIME2 NOT NULL,
         [DelayMinutes] INT NOT NULL,
+        [Speed] DECIMAL(10,2) NOT NULL,
+        [ImageUrl] NVARCHAR(MAX) NULL,
+        [VideoUrl] NVARCHAR(MAX) NULL,
+        [Latitude] DECIMAL(12,8) NOT NULL,
+        [Longitude] DECIMAL(12,8) NOT NULL,
         [LastCalculatedAt] DATETIME2 NOT NULL
     );
     

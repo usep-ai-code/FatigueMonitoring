@@ -61,10 +61,17 @@ public record DelayedFollowUpDto(
     string ExternalId,
     string UnitName,
     string OperatorName,
+    string AlertType,
     string Area,
     string Location,
     DateTime EventTime,
-    int DelayMinutes
+    string EventTimeFormatted,
+    int DelayMinutes,
+    decimal Speed,
+    string? ImageUrl,
+    string? VideoUrl,
+    decimal Latitude,
+    decimal Longitude
 );
 
 public record RecurrentUnitDto(

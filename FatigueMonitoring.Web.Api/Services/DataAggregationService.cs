@@ -515,10 +515,16 @@ public class DataAggregationService(
                 ExternalId = evt.ExternalId,
                 UnitName = evt.UnitName,
                 OperatorName = evt.ManualVerificationBy ?? "Unknown",
+                AlertType = evt.AlarmName,
                 Area = evt.Area,
                 Location = evt.Location,
                 EventTime = evt.EventTime,
                 DelayMinutes = (int)(now - evt.EventTime).TotalMinutes,
+                Speed = evt.Speed,
+                ImageUrl = evt.ImageUrl,
+                VideoUrl = evt.VideoUrl,
+                Latitude = evt.Latitude,
+                Longitude = evt.Longitude,
                 LastCalculatedAt = DateTime.UtcNow
             };
 
@@ -646,10 +652,17 @@ public class DataAggregationService(
                 d.ExternalId,
                 d.UnitName,
                 d.OperatorName,
+                d.AlertType,
                 d.Area,
                 d.Location,
                 d.EventTime,
-                d.DelayMinutes
+                d.EventTime.ToString("HH:mm:ss"),
+                d.DelayMinutes,
+                d.Speed,
+                d.ImageUrl,
+                d.VideoUrl,
+                d.Latitude,
+                d.Longitude
             ))
             .ToListAsync(cancellationToken);
 

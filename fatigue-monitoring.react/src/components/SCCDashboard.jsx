@@ -780,7 +780,7 @@ const SCCDashboard = () => {
                 <div className="flex-1 space-y-2 overflow-hidden">
                   {overdueAlerts.length > 0 ? (
                     paginate(overdueAlerts, delayedPage, ITEMS_DELAYED).map((alert) => (
-                      <div key={alert.id} onClick={() => setSelectedAlert({...alert, alertType: 'Fatigue'})} className={`relative group p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-all hover:bg-red-500/10 hover:border-red-400 ${darkMode ? 'bg-slate-900 border-red-500/30' : 'bg-white border-red-200 shadow-sm'}`}>
+                      <div key={alert.id} onClick={() => setSelectedAlert({...alert, status: 'Delayed'})} className={`relative group p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-all hover:bg-red-500/10 hover:border-red-400 ${darkMode ? 'bg-slate-900 border-red-500/30' : 'bg-white border-red-200 shadow-sm'}`}>
                         <div>
                           <div className={`font-bold text-[clamp(1rem,1.2vh,1.4rem)] ${darkMode ? 'text-white' : 'text-slate-900'}`}>{alert.unitName}</div>
                           <div className={`text-[1rem] ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>{alert.location}</div>

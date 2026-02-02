@@ -51,10 +51,17 @@
  * @property {string} externalId
  * @property {string} unitName
  * @property {string} operatorName
+ * @property {string} alertType
  * @property {string} area
  * @property {string} location
  * @property {string} eventTime
+ * @property {string} eventTimeFormatted
  * @property {number} delayMinutes
+ * @property {number} speed
+ * @property {string|null} imageUrl
+ * @property {string|null} videoUrl
+ * @property {number} latitude
+ * @property {number} longitude
  */
 
 /**
