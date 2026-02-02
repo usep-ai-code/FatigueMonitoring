@@ -210,21 +210,37 @@ public class DataAggregationService(
         string? imageUrl = null;
         string? videoUrl = null;
         
-        if (eventData.AlarmFile != null)
+        if (eventData.AlarmFile != null && eventData.AlarmFile.Count > 0)
         {
             foreach (var file in eventData.AlarmFile)
             {
-                if (file.DownUrl.Contains(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                    file.DownUrl.Contains(".png", StringComparison.OrdinalIgnoreCase) ||
-                    file.DownUrl.Contains(".jpeg", StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrEmpty(file.DownUrl)) continue;
+                
+                var url = file.DownUrl;
+                
+                // Check for image extensions (in URL or dn parameter)
+                if (url.Contains(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                    url.Contains(".png", StringComparison.OrdinalIgnoreCase) ||
+                    url.Contains(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                    url.Contains("__.jpg", StringComparison.OrdinalIgnoreCase))
                 {
-                    imageUrl = file.DownUrl;
+                    imageUrl ??= url; // Only set if not already set
+                    logger.LogDebug("Found image URL for event {EventId}: {Url}", eventData.Id, url.Substring(0, Math.Min(100, url.Length)));
                 }
-                else if (file.DownUrl.Contains(".mp4", StringComparison.OrdinalIgnoreCase) ||
-                         file.DownUrl.Contains(".avi", StringComparison.OrdinalIgnoreCase))
+                // Check for video extensions
+                else if (url.Contains(".mp4", StringComparison.OrdinalIgnoreCase) ||
+                         url.Contains(".avi", StringComparison.OrdinalIgnoreCase) ||
+                         url.Contains("__.mp4", StringComparison.OrdinalIgnoreCase))
                 {
-                    videoUrl = file.DownUrl;
+                    videoUrl ??= url; // Only set if not already set
+                    logger.LogDebug("Found video URL for event {EventId}: {Url}", eventData.Id, url.Substring(0, Math.Min(100, url.Length)));
                 }
+            }
+            
+            if (imageUrl == null && videoUrl == null)
+            {
+                logger.LogWarning("No image or video URL found for event {EventId} despite having {Count} alarm files", 
+                    eventData.Id, eventData.AlarmFile.Count);
             }
         }
 
