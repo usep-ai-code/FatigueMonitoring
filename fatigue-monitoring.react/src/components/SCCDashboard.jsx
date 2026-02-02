@@ -824,8 +824,8 @@ const SCCDashboard = () => {
                 </div>
                 <span className="bg-red-600 text-white text-[1rem] font-bold px-3 py-1 rounded-full">{highRiskOperators.length} Total</span>
               </div>
-              <div className="flex-1 flex flex-col justify-between overflow-hidden" ref={recurrentListContainerRef}>
-                <div className="flex-1 space-y-2">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden" ref={recurrentListContainerRef}>
+                <div className="flex-1 space-y-2 overflow-y-auto">
                   {highRiskOperators.length > 0 ? (
                     paginate(highRiskOperators, recurrentPage, dynamicItemsPerPage.recurrent).map((op) => (
                       <div key={op.id} className={`px-3 py-2 rounded-xl border-l-4 border-red-500 flex justify-between items-center ${darkMode ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}>
@@ -838,7 +838,9 @@ const SCCDashboard = () => {
                     ))
                   ) : <div className="flex h-full items-center justify-center text-slate-500 text-lg">No recurrent data</div>}
                 </div>
-                <PaginationControls currentPage={recurrentPage} totalPages={Math.ceil(highRiskOperators.length / dynamicItemsPerPage.recurrent)} onPageChange={setRecurrentPage} />
+                <div className="shrink-0">
+                  <PaginationControls currentPage={recurrentPage} totalPages={Math.ceil(highRiskOperators.length / dynamicItemsPerPage.recurrent)} onPageChange={setRecurrentPage} />
+                </div>
               </div>
             </div>
 
@@ -853,8 +855,8 @@ const SCCDashboard = () => {
                 </div>
                 <span className="bg-orange-600 text-white text-[1rem] font-bold px-3 py-1 rounded-full">{highFreqZones.length} Total</span>
               </div>
-              <div className="flex-1 flex flex-col justify-between overflow-hidden" ref={highRiskListContainerRef}>
-                <div className="flex-1 space-y-2">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden" ref={highRiskListContainerRef}>
+                <div className="flex-1 space-y-2 overflow-y-auto">
                   {highFreqZones.length > 0 ? (
                     paginate(highFreqZones, highRiskPage, dynamicItemsPerPage.highRisk).map((zone) => (
                       <div key={zone.id} className={`px-3 py-2 rounded-xl border flex justify-between items-center ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -872,7 +874,9 @@ const SCCDashboard = () => {
                     ))
                   ) : <div className="flex h-full items-center justify-center text-slate-500 text-lg">No high risk data</div>}
                 </div>
-                <PaginationControls currentPage={highRiskPage} totalPages={Math.ceil(highFreqZones.length / dynamicItemsPerPage.highRisk)} onPageChange={setHighRiskPage} />
+                <div className="shrink-0">
+                  <PaginationControls currentPage={highRiskPage} totalPages={Math.ceil(highFreqZones.length / dynamicItemsPerPage.highRisk)} onPageChange={setHighRiskPage} />
+                </div>
               </div>
             </div>
           </div>
