@@ -505,7 +505,7 @@ const SCCDashboard = () => {
                 </div>
                 <p className={`text-2xl ${darkMode ? 'text-slate-300' : 'opacity-70'}`}>
                   Unit <span className="font-mono font-bold bg-slate-700 text-white px-3 py-1 rounded mx-2">{selectedAlert.unitName}</span> 
-                  operated by <strong className="text-red-400">{selectedAlert.operatorName}</strong>
+                  verificated by <strong className="text-red-400">{selectedAlert.operatorName}</strong>
                 </p>
               </div>
               <button 
@@ -528,11 +528,21 @@ const SCCDashboard = () => {
                     <div className="absolute inset-0 bg-green-900/10 z-10 pointer-events-none mix-blend-overlay"></div>
                     <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,#000_100%)] z-20 pointer-events-none"></div>
                     {selectedAlert.imageUrl ? (
-                      <img 
-                        src={selectedAlert.imageUrl} 
-                        alt="Camera Feed" 
-                        className="absolute inset-0 w-full h-full object-contain bg-black"
-                      />
+                      <>
+                        <img 
+                          src={selectedAlert.imageUrl} 
+                          alt="Camera Feed" 
+                          className="absolute inset-0 w-full h-full object-contain bg-black"
+                        />
+                        {/* Red overlay label */}
+                        <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                          <div className="border-4 border-red-500/80 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse flex flex-col items-center justify-end p-4 min-w-[200px]">
+                            <div className="bg-red-600 text-white text-lg font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg">
+                              <EyeOff size={20} /> {selectedAlert.alertType || 'FATIGUE'}
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="border-4 border-red-500/80 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse flex flex-col items-center justify-center p-8">
