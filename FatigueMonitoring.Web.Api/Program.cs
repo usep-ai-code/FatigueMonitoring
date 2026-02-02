@@ -33,16 +33,15 @@ try
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
 
-    // Configure CORS for React frontend
+    // Configure CORS for React frontend (read from configuration)
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+        ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+    
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowReactApp", policy =>
         {
-            policy.WithOrigins(
-                    "http://localhost:5173",
-                    "http://localhost:3000",
-                    "https://*.azurewebsites.net"
-                )
+            policy.WithOrigins(corsOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
