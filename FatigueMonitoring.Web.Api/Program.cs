@@ -113,9 +113,18 @@ try
     app.UseCors("AllowReactApp");
 
     app.UseHttpsRedirection();
+    
+    // Serve static files from wwwroot (React build output)
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+    
     app.UseAuthorization();
 
     app.MapControllers();
+    
+    // SPA Fallback: For any request that doesn't match an API route or static file,
+    // serve the React app's index.html (client-side routing)
+    app.MapFallbackToFile("index.html");
 
     // Log the URLs/ports the application is listening on
     app.Lifetime.ApplicationStarted.Register(() =>

@@ -2,18 +2,19 @@
 // In production, this should come from environment variables
 
 const getApiBaseUrl = () => {
-  // Check for Vite environment variables
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  // Check for Vite environment variables (and make sure it's not empty)
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim() !== '') {
+    return envUrl.trim();
   }
   
   // Default to localhost for development
   if (import.meta.env.DEV) {
-    return 'https://localhost:7001';
+    return 'https://localhost:7217';
   }
   
-  // Production: assume same origin or configure via env
-  return window.location.origin;
+  // Production: use same origin (frontend served by backend)
+  return '';  // Empty string = same origin, relative URLs
 };
 
 export const API_CONFIG = {
