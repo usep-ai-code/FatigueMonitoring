@@ -393,13 +393,20 @@ const SCCDashboard = () => {
     return sseData.highRiskAreas.filter(h => h.area === selectedArea);
   }, [sseData?.highRiskAreas, selectedArea]);
 
-  // Device health (can be enhanced with real data)
-  const deviceHealth = {
-    total: 142,
-    online: isConnected ? 135 : 0,
-    offline: isConnected ? 7 : 142,
-    coverage: isConnected ? 95 : 0
-  };
+  // Sensor Health - based on follow up status
+  const sensorHealth = useMemo(() => {
+    const total = stats.totalToday || 0;
+    const followedUp = stats.followedUpToday || 0;
+    const waitingFollowUp = stats.activeOpen || 0;
+    const coverage = total > 0 ? Math.round((followedUp / total) * 100) : 0;
+    
+    return {
+      total,
+      followedUp,
+      waitingFollowUp,
+      coverage
+    };
+  }, [stats]);
 
   const handleAreaTabClick = (area) => {
     setSelectedArea(area);
@@ -615,13 +622,13 @@ const SCCDashboard = () => {
 
           <div className={`hidden md:flex items-center gap-6 px-[1.5vw] py-[1vh] rounded-full border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300 shadow-sm'}`}>
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${deviceHealth.offline === 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
-              <span className={`text-[clamp(1rem,1.2vh,1.5rem)] font-semibold whitespace-nowrap ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Sensor Health: {deviceHealth.coverage}%</span>
+              <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${sensorHealth.coverage >= 80 ? 'bg-emerald-500' : sensorHealth.coverage >= 50 ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse'}`}></div>
+              <span className={`text-[clamp(1rem,1.2vh,1.5rem)] font-semibold whitespace-nowrap ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Sensor Health: {sensorHealth.coverage}%</span>
             </div>
             <div className="h-6 w-px bg-slate-600/30"></div>
             <div className="flex items-center gap-4 text-[clamp(1rem,1.2vh,1.5rem)]">
-              <div className="flex items-center gap-2"><Wifi className="w-[2.5vh] h-[2.5vh] text-emerald-500" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{deviceHealth.online}</span></div>
-              <div className="flex items-center gap-2"><WifiOff className="w-[2.5vh] h-[2.5vh] text-red-500 ml-1" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{deviceHealth.offline}</span></div>
+              <div className="flex items-center gap-2" title="Total Followed Up"><Wifi className="w-[2.5vh] h-[2.5vh] text-emerald-500" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{sensorHealth.followedUp}</span></div>
+              <div className="flex items-center gap-2" title="Total Waiting Follow Up"><WifiOff className="w-[2.5vh] h-[2.5vh] text-red-500 ml-1" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{sensorHealth.waitingFollowUp}</span></div>
             </div>
           </div>
 
