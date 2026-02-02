@@ -33,22 +33,38 @@ public class DataAggregationService(
         try
         {
             // Get or create sync state
-            var syncState = await GetOrCreateSyncStateAsync(dbContext, cancellationToken);
+            var (syncState, isFirstSync) = await GetOrCreateSyncStateAsync(dbContext, cancellationToken);
             
             // Mark sync as in progress
             syncState.LastSyncStatus = "InProgress";
             syncState.UpdatedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            // Calculate date range: from last sync time to last sync time + window minutes
-            var startDate = syncState.LastSyncTime;
-            var endDate = startDate.AddMinutes(_jobSettings.FetchWindowMinutes);
+            // Current time in WIB (UTC+7)
+            var nowWib = DateTime.UtcNow.AddHours(7);
             
-            // Don't fetch future data - cap at current time
-            var nowWib = DateTime.UtcNow.AddHours(7); // Convert to WIB (UTC+7)
-            if (endDate > nowWib)
+            // Calculate date range
+            var startDate = syncState.LastSyncTime;
+            DateTime endDate;
+            
+            if (isFirstSync)
             {
+                // First sync: fetch from InitialStartTime to NOW
                 endDate = nowWib;
+                logger.LogInformation("First sync detected. Fetching all data from {StartDate} to {EndDate} (WIB)",
+                    startDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                    endDate.ToString("yyyy-MM-dd HH:mm:ss"));
+            }
+            else
+            {
+                // Subsequent syncs: fetch from last sync time + window minutes
+                endDate = startDate.AddMinutes(_jobSettings.FetchWindowMinutes);
+                
+                // Don't fetch future data - cap at current time
+                if (endDate > nowWib)
+                {
+                    endDate = nowWib;
+                }
             }
 
             // If start date is already at or past current time, skip this fetch
@@ -139,15 +155,19 @@ public class DataAggregationService(
         }
     }
 
-    private async Task<AI_SyncState_T> GetOrCreateSyncStateAsync(
+    private async Task<(AI_SyncState_T syncState, bool isFirstSync)> GetOrCreateSyncStateAsync(
         FatigueMonitoringDbContext dbContext, 
         CancellationToken cancellationToken)
     {
         var syncState = await dbContext.SyncStates
             .FirstOrDefaultAsync(s => s.SyncType == SyncTypeExternalApi, cancellationToken);
 
+        bool isFirstSync = false;
+
         if (syncState == null)
         {
+            isFirstSync = true;
+            
             // Parse initial start time from settings
             DateTime initialStartTime;
             if (!DateTime.TryParseExact(_jobSettings.InitialStartTime, "yyyy-MM-dd HH:mm:ss",
@@ -177,7 +197,7 @@ public class DataAggregationService(
                 initialStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
         }
 
-        return syncState;
+        return (syncState, isFirstSync);
     }
 
     private async Task ProcessEventAsync(FatigueMonitoringDbContext dbContext, EventData eventData, CancellationToken cancellationToken)
