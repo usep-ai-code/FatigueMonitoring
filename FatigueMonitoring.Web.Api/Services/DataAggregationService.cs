@@ -297,7 +297,7 @@ public class DataAggregationService(
         else
         {
             // Default assignment based on coordinates
-            area = eventData.Latitude < -2.2 ? "Hauling" : "Mining";
+            area = eventData.Latitude < -2.2m ? "Hauling" : "Mining";
             location = area == "Mining" ? "Front A" : "KM 10";
         }
 
