@@ -70,8 +70,8 @@ const SCCDashboard = () => {
     mining: 4,
     hauling: 4,
     activeFatigue: 6,
-    recurrent: 3,
-    highRisk: 3
+    recurrent: 2,
+    highRisk: 2
   });
 
   const ITEMS_DELAYED = 4;
@@ -106,19 +106,8 @@ const SCCDashboard = () => {
         setDynamicItemsPerPage(prev => ({ ...prev, activeFatigue: rows }));
       }
 
-      if (recurrentListContainerRef.current) {
-        const height = recurrentListContainerRef.current.clientHeight;
-        const availableHeight = height - PAGINATION_HEIGHT_BUFFER;
-        const rows = Math.max(2, Math.floor(availableHeight / ITEM_HEIGHT_RECURRENT));
-        setDynamicItemsPerPage(prev => ({ ...prev, recurrent: rows }));
-      }
-
-      if (highRiskListContainerRef.current) {
-        const height = highRiskListContainerRef.current.clientHeight;
-        const availableHeight = height - PAGINATION_HEIGHT_BUFFER;
-        const rows = Math.max(2, Math.floor(availableHeight / ITEM_HEIGHT_HIGH_RISK));
-        setDynamicItemsPerPage(prev => ({ ...prev, highRisk: rows }));
-      }
+      // Recurrent and High Risk are fixed at 2 items max
+      setDynamicItemsPerPage(prev => ({ ...prev, recurrent: 2, highRisk: 2 }));
     };
 
     calculateCapacity();
