@@ -134,7 +134,25 @@ try
 
     app.MapControllers();
 
-    Log.Information("Application started. Listening for requests...");
+    // Log the URLs/ports the application is listening on
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        var addresses = app.Urls;
+        Log.Information("========================================");
+        Log.Information("Application started successfully!");
+        Log.Information("========================================");
+        Log.Information("Listening on the following URLs:");
+        foreach (var address in addresses)
+        {
+            Log.Information("  → {Address}", address);
+        }
+        Log.Information("========================================");
+        Log.Information("Swagger UI: {SwaggerUrl}", $"{addresses.FirstOrDefault()}/swagger");
+        Log.Information("Dashboard API: {ApiUrl}", $"{addresses.FirstOrDefault()}/api/dashboard");
+        Log.Information("SSE Stream: {SseUrl}", $"{addresses.FirstOrDefault()}/api/dashboard/stream");
+        Log.Information("========================================");
+    });
+    
     await app.RunAsync();
 }
 catch (Exception ex)
