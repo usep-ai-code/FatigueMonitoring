@@ -95,7 +95,7 @@ The API will be available at `https://localhost:7001`.
 
 ### Events
 - Endpoint: `POST /api/v1/events/`
-- Filter: `manual_verification_is_true_alarm = true`
+- Filter: `manual_verification_is_true_alarm = true` AND `level = 3`
 
 ### Follow-ups
 - Endpoint: `GET /api/v1/evidence/{alarmGuid}/follow-ups`

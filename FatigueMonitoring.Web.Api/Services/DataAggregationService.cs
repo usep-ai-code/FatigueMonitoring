@@ -91,7 +91,7 @@ public class DataAggregationService(
             {
                 var response = await externalApiService.GetEventsAsync(
                     startDate, endDate, page, 100, 
-                    "manual_verification_is_true_alarm", "true",
+                    "manual_verification_is_true_alarm,level", "true|3",
                     cancellationToken);
 
                 if (response?.Success == true && response.Data?.List != null)
