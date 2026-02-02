@@ -144,15 +144,27 @@ const SCCDashboard = () => {
   // Notification queue ref for staggered display
   const notificationQueueRef = useRef([]);
   const isProcessingQueueRef = useRef(false);
+  const processTimeoutRef = useRef(null);
 
   // Stagger delay constants (milliseconds)
-  const NOTIFICATION_STAGGER_DELAY = 300; // Delay between showing each notification
+  const NOTIFICATION_STAGGER_DELAY = 400; // Delay between showing each notification
   const NOTIFICATION_AUTO_CLOSE_DELAY = 4000; // How long notification stays visible
-  const NOTIFICATION_CLOSE_STAGGER_DELAY = 200; // Delay between closing each notification
 
   // Process notification queue - show one by one with stagger
   const processNotificationQueue = useCallback(() => {
-    if (isProcessingQueueRef.current || notificationQueueRef.current.length === 0) {
+    // Clear any pending process trigger
+    if (processTimeoutRef.current) {
+      clearTimeout(processTimeoutRef.current);
+      processTimeoutRef.current = null;
+    }
+
+    // Already processing, let it continue
+    if (isProcessingQueueRef.current) {
+      return;
+    }
+
+    // Nothing to process
+    if (notificationQueueRef.current.length === 0) {
       return;
     }
 
@@ -167,7 +179,7 @@ const SCCDashboard = () => {
       const nextNotif = notificationQueueRef.current.shift();
       setNotifications(prev => [nextNotif, ...prev]);
 
-      // Schedule auto-close with stagger based on current queue position
+      // Schedule auto-close
       setTimeout(() => {
         setNotifications(prev => prev.filter(n => n.id !== nextNotif.id));
       }, NOTIFICATION_AUTO_CLOSE_DELAY);
@@ -183,12 +195,20 @@ const SCCDashboard = () => {
     processNext();
   }, []);
 
-  // Add notification to queue
+  // Add notification to queue (debounced processing)
   const addNotification = useCallback((title, message, type = 'critical') => {
     const id = Date.now() + Math.random();
     const newNotif = { id, title, message, type };
     notificationQueueRef.current.push(newNotif);
-    processNotificationQueue();
+    
+    // Debounce: wait a tick to allow all sync additions to complete
+    // before starting to process the queue
+    if (!isProcessingQueueRef.current && !processTimeoutRef.current) {
+      processTimeoutRef.current = setTimeout(() => {
+        processTimeoutRef.current = null;
+        processNotificationQueue();
+      }, 10); // Small delay to batch all sync additions
+    }
   }, [processNotificationQueue]);
 
   const removeNotification = useCallback((id) => {
