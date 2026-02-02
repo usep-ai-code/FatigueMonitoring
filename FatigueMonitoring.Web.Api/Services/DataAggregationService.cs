@@ -136,7 +136,9 @@ public class DataAggregationService(
             try
             {
                 var syncState = await dbContext.SyncStates
-                    .FirstOrDefaultAsync(s => s.SyncType == SyncTypeExternalApi, cancellationToken);
+                    .Where(s => s.SyncType == SyncTypeExternalApi)
+                    .OrderBy(s => s.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
                 
                 if (syncState != null)
                 {
@@ -158,7 +160,9 @@ public class DataAggregationService(
         CancellationToken cancellationToken)
     {
         var syncState = await dbContext.SyncStates
-            .FirstOrDefaultAsync(s => s.SyncType == SyncTypeExternalApi, cancellationToken);
+            .Where(s => s.SyncType == SyncTypeExternalApi)
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         bool isFirstSync = false;
 
@@ -202,7 +206,9 @@ public class DataAggregationService(
     {
         // Check if event already exists
         var existingEvent = await dbContext.FatigueEvents
-            .FirstOrDefaultAsync(e => e.ExternalId == eventData.Id, cancellationToken);
+            .Where(e => e.ExternalId == eventData.Id)
+            .OrderBy(e => e.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         var (area, location) = DetermineAreaAndLocation(eventData);
 
@@ -596,8 +602,10 @@ public class DataAggregationService(
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FatigueMonitoringDbContext>();
 
-        // Get summary
-        var summary = await dbContext.DashboardSummaries.FirstOrDefaultAsync(cancellationToken);
+        // Get summary (order by Id to avoid EF Core warning)
+        var summary = await dbContext.DashboardSummaries
+            .OrderByDescending(s => s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         // Get area distributions
         var distributions = await dbContext.AreaDistributions.ToListAsync(cancellationToken);

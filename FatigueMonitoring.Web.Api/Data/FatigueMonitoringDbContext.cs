@@ -69,6 +69,9 @@ public class FatigueMonitoringDbContext(DbContextOptions<FatigueMonitoringDbCont
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.FatigueEventId);
             entity.HasIndex(e => e.DelayMinutes);
+            entity.Property(e => e.Speed).HasPrecision(10, 2);
+            entity.Property(e => e.Latitude).HasPrecision(12, 8);
+            entity.Property(e => e.Longitude).HasPrecision(12, 8);
         });
 
         // AI_RecurrentUnit_T
