@@ -520,35 +520,38 @@ const SCCDashboard = () => {
             <div className="flex-1 p-[3vh] overflow-hidden">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-[4vh] h-full">
                 {/* LEFT */}
-                <div className="flex flex-col gap-[2vh] h-full">
+                <div className="flex flex-col gap-[2vh] h-full overflow-hidden">
                   <h3 className={`font-bold text-xl uppercase tracking-wider flex items-center gap-3 shrink-0 ${darkMode ? 'text-slate-200' : 'opacity-70'}`}>
                     <Camera size={28}/> In-Cabin Camera Feed
                   </h3>
-                  <div className="flex-1 relative rounded-2xl bg-black border-4 border-slate-700 overflow-hidden group">
+                  <div className="flex-1 min-h-0 relative rounded-2xl bg-black border-4 border-slate-700 overflow-hidden group">
                     <div className="absolute inset-0 bg-green-900/10 z-10 pointer-events-none mix-blend-overlay"></div>
                     <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,#000_100%)] z-20 pointer-events-none"></div>
                     {selectedAlert.imageUrl ? (
                       <img 
                         src={selectedAlert.imageUrl} 
                         alt="Camera Feed" 
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
                       />
                     ) : (
-                      <div className="absolute top-[25%] left-[30%] right-[30%] bottom-[25%] border-4 border-red-500/80 rounded-xl z-30 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse flex flex-col items-center justify-end pb-8">
-                        <div className="bg-red-600 text-white text-xl font-bold px-6 py-3 rounded-lg flex items-center gap-3 shadow-lg">
-                          <EyeOff size={24} /> {selectedAlert.alertType}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="border-4 border-red-500/80 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse flex flex-col items-center justify-center p-8">
+                          <EyeOff size={64} className="text-red-500 mb-4" />
+                          <div className="bg-red-600 text-white text-xl font-bold px-6 py-3 rounded-lg flex items-center gap-3 shadow-lg">
+                            {selectedAlert.alertType || 'No Image'}
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 shrink-0 h-[12vh]">
-                    <div className={`p-6 rounded-xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
+                  <div className="grid grid-cols-2 gap-4 shrink-0">
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
                       <span className={`text-sm block uppercase tracking-wider font-bold mb-1 ${darkMode ? 'text-slate-300' : 'opacity-60'}`}>Vehicle Speed</span>
-                      <span className="font-mono font-bold text-5xl">{selectedAlert.speed} km/h</span>
+                      <span className="font-mono font-bold text-4xl">{selectedAlert.speed || 0} km/h</span>
                     </div>
-                    <div className={`p-6 rounded-xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
                       <span className={`text-sm block uppercase tracking-wider font-bold mb-1 ${darkMode ? 'text-slate-300' : 'opacity-60'}`}>Fatigue Type</span>
-                      <span className="font-bold text-4xl text-red-500">{selectedAlert.alertType}</span>
+                      <span className="font-bold text-3xl text-red-500">{selectedAlert.alertType || 'Unknown'}</span>
                     </div>
                   </div>
                 </div>
