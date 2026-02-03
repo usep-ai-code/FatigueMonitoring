@@ -308,28 +308,34 @@ const SCCDashboard = () => {
   const filteredAlerts = useMemo(() => {
     if (!sseData?.activeAlerts) return [];
     
+    // Calculate current WIB time (GMT+7) for Active Alerts calculation
+    // Server time uses WIB, so we need to compare with WIB
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const currentWibTime = new Date(utc + (7 * 60 * 60 * 1000)); // GMT+7 (WIB)
+    
     return sseData.activeAlerts
       .map(alert => {
-        // Calculate dynamic duration based on current WITA time
+        // Calculate dynamic duration based on current WIB time (server time)
         const dynamicDuration = (() => {
           if (!alert.eventTime) return 0;
           try {
-            // EventTime from backend is in WITA (no timezone info)
-            // Parse it and treat as WITA time
+            // EventTime from backend is in WITA (GMT+8)
+            // But we calculate duration using WIB (server time, GMT+7)
             let eventDate;
             const eventTimeStr = alert.eventTime;
             
             if (typeof eventTimeStr === 'string') {
               // Handle ISO format from JSON (e.g., "2026-02-01T09:11:58")
-              // This is WITA time, so we need to parse it correctly
-              // Remove any Z suffix and parse as local
+              // Parse and treat as WITA time, then convert to WIB for calculation
               const cleanStr = eventTimeStr.replace('Z', '').replace('T', ' ');
               const parts = cleanStr.split(/[-: ]/);
               if (parts.length >= 6) {
                 // Create date from parts (year, month-1, day, hour, min, sec)
+                // This is WITA time (GMT+8), subtract 1 hour to get WIB (GMT+7)
                 eventDate = new Date(
                   parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
-                  parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5])
+                  parseInt(parts[3]) - 1, parseInt(parts[4]), parseInt(parts[5])
                 );
               } else {
                 eventDate = new Date(eventTimeStr);
@@ -340,8 +346,8 @@ const SCCDashboard = () => {
             
             if (isNaN(eventDate.getTime())) return alert.openDurationMinutes || 0;
             
-            // currentTime is already in WITA, eventDate is now also treated as WITA
-            const diffMs = currentTime.getTime() - eventDate.getTime();
+            // Compare WIB times
+            const diffMs = currentWibTime.getTime() - eventDate.getTime();
             return Math.max(0, Math.floor(diffMs / (1000 * 60)));
           } catch {
             return alert.openDurationMinutes || 0;
@@ -366,7 +372,7 @@ const SCCDashboard = () => {
         const areaMatch = selectedArea === 'All' || alert.area === selectedArea;
         return areaMatch;
       });
-  }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter, currentTime]);
+  }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter]);
 
   const overdueAlerts = useMemo(() => {
     // TEMPORARILY HARDCODED TO EMPTY FOR PRESENTATION
