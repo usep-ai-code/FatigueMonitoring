@@ -51,6 +51,7 @@ const SCCDashboard = () => {
 
   // Track previous alerts for notification detection
   const prevAlertsRef = useRef([]);
+  const isInitialLoadRef = useRef(true); // Flag to skip notifications on first load
 
   // --- REFS FOR DYNAMIC PAGINATION ---
   const miningListContainerRef = useRef(null);
@@ -207,21 +208,32 @@ const SCCDashboard = () => {
   }, []);
 
   // Detect new alerts and show notifications (staggered)
+  // Skip notifications on initial load - only show for NEW alerts after app is running
   useEffect(() => {
     if (sseData?.activeAlerts) {
-      const currentIds = new Set(sseData.activeAlerts.map(a => a.externalId));
+      // On initial load, just store the alerts without showing notifications
+      if (isInitialLoadRef.current) {
+        prevAlertsRef.current = sseData.activeAlerts;
+        isInitialLoadRef.current = false;
+        console.log('Initial load: stored', sseData.activeAlerts.length, 'alerts without notifications');
+        return;
+      }
+      
       const prevIds = new Set(prevAlertsRef.current.map(a => a.externalId));
       
-      // Find new alerts
+      // Find new alerts (alerts that weren't in previous data)
       const newAlerts = sseData.activeAlerts.filter(a => !prevIds.has(a.externalId));
       
-      // Queue notifications for each new alert (will be shown with stagger)
-      newAlerts.forEach(alert => {
-        addNotification(
-          'New Fatigue Alert!',
-          `Unit ${alert.unitName} detected in ${alert.location}`
-        );
-      });
+      // Queue notifications only for genuinely NEW alerts
+      if (newAlerts.length > 0) {
+        console.log('New alerts detected:', newAlerts.length);
+        newAlerts.forEach(alert => {
+          addNotification(
+            'New Fatigue Alert!',
+            `Unit ${alert.unitName} detected in ${alert.location}`
+          );
+        });
+      }
       
       prevAlertsRef.current = sseData.activeAlerts;
     }
