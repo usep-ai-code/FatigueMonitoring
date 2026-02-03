@@ -48,15 +48,18 @@ try
         });
     });
 
-    // Configure Database
+    // Configure Database with extended timeout for bulk operations
     builder.Services.AddDbContext<FatigueMonitoringDbContext>(options =>
         options.UseSqlServer(
             builder.Configuration.GetConnectionString("DefaultConnection"),
-            sqlOptions => sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(30),
-                errorNumbersToAdd: null
-            )
+            sqlOptions => {
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(30),
+                    errorNumbersToAdd: null
+                );
+                sqlOptions.CommandTimeout(180); // 3 minutes timeout for bulk operations
+            }
         )
         .ConfigureWarnings(warnings => warnings
             .Ignore(RelationalEventId.PendingModelChangesWarning))

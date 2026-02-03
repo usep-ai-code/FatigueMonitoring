@@ -6,6 +6,13 @@ using Microsoft.Extensions.Options;
 
 namespace FatigueMonitoring.Web.Api.Services;
 
+public enum ProcessResult
+{
+    Inserted,
+    Updated,
+    Skipped
+}
+
 public interface IDataAggregationService
 {
     Task FetchAndProcessEventsAsync(CancellationToken cancellationToken = default);
@@ -21,6 +28,7 @@ public class DataAggregationService(
 {
     private const int DelayThresholdMinutes = 30;
     private const string SyncTypeExternalApi = "ExternalApiEvents";
+    private const int BatchSize = 50; // Process and save in batches of 50
     private readonly BackgroundJobSettings _jobSettings = jobSettings.Value;
 
     public async Task FetchAndProcessEventsAsync(CancellationToken cancellationToken = default)
@@ -111,10 +119,39 @@ public class DataAggregationService(
             logger.LogInformation("Fetched {Count} events from external API for period {StartDate:yyyy-MM-dd HH:mm:ss} to {EndDate:yyyy-MM-dd HH:mm:ss}", 
                 allEvents.Count, startDate, endDate);
 
-            // Process and store events
-            foreach (var eventData in allEvents)
+            // Process and store events in batches to avoid timeout
+            int processedCount = 0;
+            int skippedCount = 0;
+            int updatedCount = 0;
+            int insertedCount = 0;
+            
+            for (int i = 0; i < allEvents.Count; i += BatchSize)
             {
-                await ProcessEventAsync(dbContext, eventData, cancellationToken);
+                var batch = allEvents.Skip(i).Take(BatchSize).ToList();
+                
+                foreach (var eventData in batch)
+                {
+                    var result = await ProcessEventAsync(dbContext, eventData, cancellationToken);
+                    switch (result)
+                    {
+                        case ProcessResult.Inserted:
+                            insertedCount++;
+                            break;
+                        case ProcessResult.Updated:
+                            updatedCount++;
+                            break;
+                        case ProcessResult.Skipped:
+                            skippedCount++;
+                            break;
+                    }
+                    processedCount++;
+                }
+                
+                // Save batch to database
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogDebug("Saved batch {BatchNum}/{TotalBatches} ({ProcessedCount}/{TotalCount} events)", 
+                    (i / BatchSize) + 1, (int)Math.Ceiling((double)allEvents.Count / BatchSize), 
+                    processedCount, allEvents.Count);
             }
 
             // Update sync state with new last sync time
@@ -125,8 +162,8 @@ public class DataAggregationService(
             syncState.UpdatedAt = DateTime.UtcNow;
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Successfully processed {Count} events. Next sync will start from {NextStart:yyyy-MM-dd HH:mm:ss}", 
-                allEvents.Count, endDate);
+            logger.LogInformation("Successfully processed {Count} events (Inserted: {Inserted}, Updated: {Updated}, Skipped: {Skipped}). Next sync will start from {NextStart:yyyy-MM-dd HH:mm:ss}", 
+                allEvents.Count, insertedCount, updatedCount, skippedCount, endDate);
         }
         catch (Exception ex)
         {
@@ -202,13 +239,32 @@ public class DataAggregationService(
         return (syncState, isFirstSync);
     }
 
-    private async Task ProcessEventAsync(FatigueMonitoringDbContext dbContext, EventData eventData, CancellationToken cancellationToken)
+    private async Task<ProcessResult> ProcessEventAsync(FatigueMonitoringDbContext dbContext, EventData eventData, CancellationToken cancellationToken)
     {
-        // Check if event already exists
+        // Parse the new event time first
+        var newEventTime = ParseDateTime(eventData.Time);
+        
+        // Check if event already exists by ExternalId
         var existingEvent = await dbContext.FatigueEvents
             .Where(e => e.ExternalId == eventData.Id)
             .OrderBy(e => e.Id)
             .FirstOrDefaultAsync(cancellationToken);
+
+        // If event exists, compare EventTime to decide update or skip
+        if (existingEvent != null)
+        {
+            // Skip if existing event has same or newer EventTime
+            if (existingEvent.EventTime >= newEventTime)
+            {
+                logger.LogDebug("Skipped event {ExternalId}: existing EventTime {ExistingTime} >= new EventTime {NewTime}", 
+                    eventData.Id, existingEvent.EventTime, newEventTime);
+                return ProcessResult.Skipped;
+            }
+            
+            // Update only if new event has newer EventTime
+            logger.LogDebug("Updating event {ExternalId}: new EventTime {NewTime} > existing EventTime {ExistingTime}", 
+                eventData.Id, newEventTime, existingEvent.EventTime);
+        }
 
         var (area, location) = DetermineAreaAndLocation(eventData);
 
@@ -231,7 +287,6 @@ public class DataAggregationService(
                     url.Contains("__.jpg", StringComparison.OrdinalIgnoreCase))
                 {
                     imageUrl ??= url; // Only set if not already set
-                    logger.LogDebug("Found image URL for event {EventId}: {Url}", eventData.Id, url.Substring(0, Math.Min(100, url.Length)));
                 }
                 // Check for video extensions
                 else if (url.Contains(".mp4", StringComparison.OrdinalIgnoreCase) ||
@@ -239,14 +294,7 @@ public class DataAggregationService(
                          url.Contains("__.mp4", StringComparison.OrdinalIgnoreCase))
                 {
                     videoUrl ??= url; // Only set if not already set
-                    logger.LogDebug("Found video URL for event {EventId}: {Url}", eventData.Id, url.Substring(0, Math.Min(100, url.Length)));
                 }
-            }
-            
-            if (imageUrl == null && videoUrl == null)
-            {
-                logger.LogWarning("No image or video URL found for event {EventId} despite having {Count} alarm files", 
-                    eventData.Id, eventData.AlarmFile.Count);
             }
         }
 
@@ -260,7 +308,7 @@ public class DataAggregationService(
                 Identity = eventData.Identity ?? string.Empty,
                 AlarmName = eventData.Name ?? "Unknown",
                 AlarmType = eventData.AlarmType ?? string.Empty,
-                EventTime = ParseDateTime(eventData.Time),
+                EventTime = newEventTime,
                 ServerTime = ParseDateTime(eventData.ServerTime),
                 Shift = eventData.Shift ?? string.Empty,
                 ShiftDate = ParseDateTime(eventData.ShiftDate),
@@ -289,11 +337,14 @@ public class DataAggregationService(
             };
 
             dbContext.FatigueEvents.Add(newEvent);
-            logger.LogDebug("Added new event: {ExternalId} - {UnitName}", eventData.Id, eventData.Device?.Name);
+            logger.LogDebug("Inserted new event: {ExternalId} - {UnitName}", eventData.Id, eventData.Device?.Name);
+            return ProcessResult.Inserted;
         }
         else
         {
-            // Update existing event
+            // Update existing event with newer data
+            existingEvent.EventTime = newEventTime;
+            existingEvent.ServerTime = ParseDateTime(eventData.ServerTime);
             existingEvent.IsFollowedUp = eventData.IsFollowedUp;
             existingEvent.ManualVerificationBy = eventData.ManualVerificationBy;
             existingEvent.ManualVerificationTime = string.IsNullOrEmpty(eventData.ManualVerificationTime)
@@ -302,8 +353,11 @@ public class DataAggregationService(
             existingEvent.ManualVerificationWaitingDuration = eventData.ManualVerificationWaitingDuration;
             existingEvent.ImageUrl = imageUrl ?? existingEvent.ImageUrl;
             existingEvent.VideoUrl = videoUrl ?? existingEvent.VideoUrl;
+            existingEvent.Area = area;
+            existingEvent.Location = location;
             existingEvent.UpdatedAt = DateTime.UtcNow;
             logger.LogDebug("Updated existing event: {ExternalId}", eventData.Id);
+            return ProcessResult.Updated;
         }
     }
 
