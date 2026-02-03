@@ -304,13 +304,13 @@ const SCCDashboard = () => {
     
     if (sseData?.miningDistribution) {
       sseData.miningDistribution.forEach(item => {
-        stats.Mining[item.location] = item.count;
+        stats.Mining[item.groupName] = item.count;
       });
     }
     
     if (sseData?.haulingDistribution) {
       sseData.haulingDistribution.forEach(item => {
-        stats.Hauling[item.location] = item.count;
+        stats.Hauling[item.groupName] = item.count;
       });
     }
     

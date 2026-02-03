@@ -495,15 +495,17 @@ public class DataAggregationService(
         var oldDistributions = await dbContext.AreaDistributions.ToListAsync(cancellationToken);
         dbContext.AreaDistributions.RemoveRange(oldDistributions);
 
+        // Group by GroupName instead of Location
         var distributions = events
-            .Where(e => !e.IsFollowedUp)
-            .GroupBy(e => new { e.Area, e.Location })
+            .Where(e => !e.IsFollowedUp && !string.IsNullOrEmpty(e.GroupName))
+            .GroupBy(e => new { e.Area, e.GroupName })
             .Select(g => new AI_AreaDistribution_T
             {
                 Area = g.Key.Area,
-                Location = g.Key.Location,
+                GroupName = g.Key.GroupName,
+                Location = g.First().Location, // Keep Location for backward compatibility
                 OpenAlertCount = g.Count(),
-                TotalAlertCount = events.Count(e => e.Area == g.Key.Area && e.Location == g.Key.Location),
+                TotalAlertCount = events.Count(e => e.Area == g.Key.Area && e.GroupName == g.Key.GroupName),
                 LastCalculatedAt = DateTime.UtcNow
             })
             .ToList();
@@ -661,15 +663,15 @@ public class DataAggregationService(
             .OrderByDescending(s => s.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Get area distributions
+        // Get area distributions (grouped by GroupName)
         var distributions = await dbContext.AreaDistributions.ToListAsync(cancellationToken);
         var miningDistribution = distributions
             .Where(d => d.Area == "Mining")
-            .Select(d => new AreaDistributionDto(d.Location, d.OpenAlertCount))
+            .Select(d => new AreaDistributionDto(d.GroupName, d.OpenAlertCount))
             .ToList();
         var haulingDistribution = distributions
             .Where(d => d.Area == "Hauling")
-            .Select(d => new AreaDistributionDto(d.Location, d.OpenAlertCount))
+            .Select(d => new AreaDistributionDto(d.GroupName, d.OpenAlertCount))
             .ToList();
 
         // Get active alerts

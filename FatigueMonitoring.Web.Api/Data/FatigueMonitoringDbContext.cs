@@ -46,7 +46,7 @@ public class FatigueMonitoringDbContext(DbContextOptions<FatigueMonitoringDbCont
         {
             entity.ToTable("AI_AreaDistribution_T");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Area, e.Location });
+            entity.HasIndex(e => new { e.Area, e.GroupName });
         });
 
         // AI_ActiveAlert_T

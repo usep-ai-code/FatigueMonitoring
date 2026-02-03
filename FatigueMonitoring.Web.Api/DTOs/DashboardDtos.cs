@@ -32,7 +32,7 @@ public record AreaStatsDto(
 );
 
 public record AreaDistributionDto(
-    string Location,
+    string GroupName,
     int Count
 );
 

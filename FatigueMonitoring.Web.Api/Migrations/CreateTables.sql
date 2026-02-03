@@ -73,13 +73,22 @@ BEGIN
     CREATE TABLE [dbo].[AI_AreaDistribution_T] (
         [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [Area] NVARCHAR(450) NOT NULL,
+        [GroupName] NVARCHAR(450) NOT NULL,
         [Location] NVARCHAR(450) NOT NULL,
         [OpenAlertCount] INT NOT NULL,
         [TotalAlertCount] INT NOT NULL,
         [LastCalculatedAt] DATETIME2 NOT NULL
     );
     
-    CREATE INDEX [IX_AI_AreaDistribution_T_Area_Location] ON [dbo].[AI_AreaDistribution_T] ([Area], [Location]);
+    CREATE INDEX [IX_AI_AreaDistribution_T_Area_GroupName] ON [dbo].[AI_AreaDistribution_T] ([Area], [GroupName]);
+END
+GO
+
+-- Add GroupName column if table exists but column doesn't
+IF EXISTS (SELECT * FROM sysobjects WHERE name='AI_AreaDistribution_T' AND xtype='U')
+   AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('AI_AreaDistribution_T') AND name = 'GroupName')
+BEGIN
+    ALTER TABLE [dbo].[AI_AreaDistribution_T] ADD [GroupName] NVARCHAR(450) NOT NULL DEFAULT '';
 END
 GO
 
