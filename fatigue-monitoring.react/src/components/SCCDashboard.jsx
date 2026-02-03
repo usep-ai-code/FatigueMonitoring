@@ -369,6 +369,11 @@ const SCCDashboard = () => {
   }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter, currentTime]);
 
   const overdueAlerts = useMemo(() => {
+    // TEMPORARILY HARDCODED TO EMPTY FOR PRESENTATION
+    // TODO: Remove this hardcode when ready to show real data
+    return [];
+    
+    /* ORIGINAL CODE - UNCOMMENT WHEN READY
     if (!sseData?.delayedFollowUps) return [];
     
     // Calculate dynamic delay based on current WITA time
@@ -410,24 +415,37 @@ const SCCDashboard = () => {
       return alertsWithDynamicDelay;
     }
     return alertsWithDynamicDelay.filter(a => a.area === selectedArea);
+    */
   }, [sseData?.delayedFollowUps, selectedArea, currentTime]);
 
   const highRiskOperators = useMemo(() => {
+    // TEMPORARILY HARDCODED TO EMPTY FOR PRESENTATION
+    // TODO: Remove this hardcode when ready to show real data
+    return [];
+    
+    /* ORIGINAL CODE - UNCOMMENT WHEN READY
     if (!sseData?.recurrentUnits) return [];
     
     if (selectedArea === 'All') {
       return sseData.recurrentUnits;
     }
     return sseData.recurrentUnits.filter(r => r.primaryArea === selectedArea);
+    */
   }, [sseData?.recurrentUnits, selectedArea]);
 
   const highFreqZones = useMemo(() => {
+    // TEMPORARILY HARDCODED TO EMPTY FOR PRESENTATION
+    // TODO: Remove this hardcode when ready to show real data
+    return [];
+    
+    /* ORIGINAL CODE - UNCOMMENT WHEN READY
     if (!sseData?.highRiskAreas) return [];
     
     if (selectedArea === 'All') {
       return sseData.highRiskAreas;
     }
     return sseData.highRiskAreas.filter(h => h.area === selectedArea);
+    */
   }, [sseData?.highRiskAreas, selectedArea]);
 
   // Sensor Health - based on follow up status
