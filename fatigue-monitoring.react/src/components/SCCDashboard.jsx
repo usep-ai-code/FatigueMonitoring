@@ -699,7 +699,7 @@ const SCCDashboard = () => {
         </div>
 
         <div className="flex items-center gap-[2vw]">
-          {/* SSE Connection Status Indicator */}
+          {/* SSE Connection Status Indicator - HIDDEN FOR PRESENTATION
           <SseStatusIndicator 
             status={sseStatus}
             lastHeartbeat={lastHeartbeat}
@@ -707,7 +707,9 @@ const SCCDashboard = () => {
             darkMode={darkMode}
             showText={true}
           />
+          */}
 
+          {/* Sensor Health - HIDDEN FOR PRESENTATION
           <div className={`hidden md:flex items-center gap-6 px-[1.5vw] py-[1vh] rounded-full border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300 shadow-sm'}`}>
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${sensorHealth.coverage >= 80 ? 'bg-emerald-500' : sensorHealth.coverage >= 50 ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse'}`}></div>
@@ -719,6 +721,7 @@ const SCCDashboard = () => {
               <div className="flex items-center gap-2" title="Total Waiting Follow Up"><WifiOff className="w-[2.5vh] h-[2.5vh] text-red-500 ml-1" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{sensorHealth.waitingFollowUp}</span></div>
             </div>
           </div>
+          */}
 
           <div className={`flex flex-col items-end ${darkMode ? 'text-white' : 'text-slate-600'}`}>
             <span className="text-[clamp(1.8rem,3vh,3.5rem)] font-mono font-bold leading-none">

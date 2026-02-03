@@ -434,6 +434,8 @@ public class DataAggregationService(
         return DateTime.UtcNow;
     }
 
+    private const int MaxWaitingFollowUp = 3; // Maximum allowed waiting follow up alerts
+
     public async Task CalculateAggregationsAsync(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Starting aggregation calculation");
@@ -447,6 +449,15 @@ public class DataAggregationService(
 
         // Get all events for today
         var todayEvents = await dbContext.FatigueEvents
+            .Where(e => e.EventTime >= todayStart)
+            .ToListAsync(cancellationToken);
+
+        // PRESENTATION MODE: Limit Waiting Follow Up to max 3
+        // Auto-close older alerts if there are more than 3 open
+        await LimitWaitingFollowUpAsync(dbContext, todayEvents, cancellationToken);
+        
+        // Refresh todayEvents after potential updates
+        todayEvents = await dbContext.FatigueEvents
             .Where(e => e.EventTime >= todayStart)
             .ToListAsync(cancellationToken);
 
@@ -470,6 +481,49 @@ public class DataAggregationService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Aggregation calculation completed. Processed {Count} events for today.", todayEvents.Count);
+    }
+
+    /// <summary>
+    /// PRESENTATION MODE: Limit Waiting Follow Up to maximum allowed (3)
+    /// Auto-closes older alerts if there are more than MaxWaitingFollowUp open alerts
+    /// </summary>
+    private async Task LimitWaitingFollowUpAsync(
+        FatigueMonitoringDbContext dbContext,
+        List<AI_FatigueEvent_T> events,
+        CancellationToken cancellationToken)
+    {
+        // Get all open (not followed up) events, ordered by EventTime descending (newest first)
+        var openEvents = events
+            .Where(e => !e.IsFollowedUp)
+            .OrderByDescending(e => e.EventTime)
+            .ToList();
+
+        if (openEvents.Count <= MaxWaitingFollowUp)
+        {
+            logger.LogDebug("Waiting Follow Up count ({Count}) is within limit ({Max})", openEvents.Count, MaxWaitingFollowUp);
+            return;
+        }
+
+        // Keep only the newest MaxWaitingFollowUp alerts open, close the rest
+        var alertsToClose = openEvents.Skip(MaxWaitingFollowUp).ToList();
+        
+        logger.LogInformation("PRESENTATION MODE: Closing {Count} older alerts to keep Waiting Follow Up at max {Max}", 
+            alertsToClose.Count, MaxWaitingFollowUp);
+
+        foreach (var alert in alertsToClose)
+        {
+            alert.IsFollowedUp = true;
+            alert.ManualVerificationBy = "System (Auto-Close)";
+            alert.ManualVerificationTime = DateTime.UtcNow;
+            alert.ManualVerificationMemo = "Auto-closed by system to maintain max waiting follow up limit";
+            alert.UpdatedAt = DateTime.UtcNow;
+            
+            logger.LogDebug("Auto-closed alert: {ExternalId} - {UnitName} (EventTime: {EventTime})", 
+                alert.ExternalId, alert.UnitName, alert.EventTime);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Successfully auto-closed {Count} alerts", alertsToClose.Count);
     }
 
     private async Task CalculateDashboardSummaryAsync(
