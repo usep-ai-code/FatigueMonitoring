@@ -368,11 +368,11 @@ const SCCDashboard = () => {
         return { ...alert, dynamicDurationMinutes: dynamicDuration };
       })
       .filter(alert => {
-        // Must be Open status AND less than or equal to 30 minutes
+        // Show all Open status alerts (Waiting Follow Up)
+        // No 30-minute filter - Active Alerts = all Waiting Follow Up items
         const isOpen = alert.status === 'Open';
-        const isUnder30Min = alert.dynamicDurationMinutes <= 30;
         
-        if (!isOpen || !isUnder30Min) return false;
+        if (!isOpen) return false;
         
         // Apply location filter if set
         if (selectedLocationFilter) {
@@ -996,7 +996,7 @@ const SCCDashboard = () => {
                 </div>
                 <span className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-600'}`}>{filteredAlerts.length} Total</span>
               </div>
-              <div className={`flex justify-between items-center text-[1rem] ${darkMode ? 'text-slate-300' : 'opacity-60'}`}><span>Recent Alerts</span><span className="text-red-500 font-bold">OPEN ≤ 30m</span></div>
+              <div className={`flex justify-between items-center text-[1rem] ${darkMode ? 'text-slate-300' : 'opacity-60'}`}><span>Waiting Follow Up Details</span><span className="text-red-500 font-bold">OPEN</span></div>
             </div>
 
             <div className="flex-1 flex flex-col justify-between overflow-hidden p-[2vh]" ref={activeFatigueListContainerRef}>
