@@ -155,7 +155,23 @@ public class DataAggregationService(
             }
 
             // Update sync state with new last sync time
-            syncState.LastSyncTime = endDate;
+            // For first sync: use current time AFTER completion (not pre-calculated endDate)
+            // This prevents "behind" sync time when first sync takes a long time
+            // For subsequent syncs: use the calculated endDate (windowed approach)
+            DateTime nextSyncTime;
+            if (isFirstSync)
+            {
+                // First sync completed - set to current time so next sync starts fresh
+                nextSyncTime = DateTime.UtcNow.AddHours(7); // Current WIB time after completion
+                logger.LogInformation("First sync completed. Setting next sync time to current time: {NextSyncTime:yyyy-MM-dd HH:mm:ss}", nextSyncTime);
+            }
+            else
+            {
+                // Subsequent syncs - use the windowed endDate
+                nextSyncTime = endDate;
+            }
+            
+            syncState.LastSyncTime = nextSyncTime;
             syncState.LastSyncRecordCount = allEvents.Count;
             syncState.LastSyncStatus = "Success";
             syncState.LastSyncError = null;
@@ -163,7 +179,7 @@ public class DataAggregationService(
 
             await dbContext.SaveChangesAsync(cancellationToken);
             logger.LogInformation("Successfully processed {Count} events (Inserted: {Inserted}, Updated: {Updated}, Skipped: {Skipped}). Next sync will start from {NextStart:yyyy-MM-dd HH:mm:ss}", 
-                allEvents.Count, insertedCount, updatedCount, skippedCount, endDate);
+                allEvents.Count, insertedCount, updatedCount, skippedCount, nextSyncTime);
         }
         catch (Exception ex)
         {
