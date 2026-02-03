@@ -5,19 +5,51 @@ import { API_CONFIG, getApiUrl } from '../services/config';
 /**
  * Custom hook for SSE (Server-Sent Events) connection
  * Handles connection, reconnection, heartbeat, and data updates
+ * Also fetches initial data immediately via REST API
  */
 export function useSse() {
   const [status, setStatus] = useState(SSE_STATUS.DISCONNECTED);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [lastHeartbeat, setLastHeartbeat] = useState(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
   const eventSourceRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const heartbeatTimeoutRef = useRef(null);
+  const initialFetchDoneRef = useRef(false);
   
   const RECONNECT_DELAY = 5000; // 5 seconds
   const HEARTBEAT_TIMEOUT = 60000; // 60 seconds - if no heartbeat received
+
+  /**
+   * Fetch initial data immediately via REST API
+   * This ensures data is available before SSE connection is established
+   */
+  const fetchInitialData = useCallback(async () => {
+    // Prevent duplicate fetches
+    if (initialFetchDoneRef.current) return;
+    
+    try {
+      setIsInitialLoading(true);
+      const url = getApiUrl(API_CONFIG.ENDPOINTS.DASHBOARD);
+      console.log('Fetching initial data from:', url);
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        const initialData = await response.json();
+        setData(initialData);
+        console.log('Initial data loaded successfully');
+      } else {
+        console.error('Failed to fetch initial data:', response.status, response.statusText);
+      }
+    } catch (err) {
+      console.error('Error fetching initial data:', err);
+    } finally {
+      setIsInitialLoading(false);
+      initialFetchDoneRef.current = true;
+    }
+  }, []);
 
   const clearTimeouts = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -141,21 +173,31 @@ export function useSse() {
     }
   }, [resetHeartbeatTimer, clearTimeouts]);
 
-  // Auto-connect on mount
+  // Fetch initial data and connect to SSE on mount
   useEffect(() => {
+    // Fetch data immediately via REST API (doesn't wait for SSE)
+    fetchInitialData();
+    
+    // Also establish SSE connection for real-time updates
     connect();
 
     // Cleanup on unmount
     return () => {
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [fetchInitialData, connect, disconnect]);
 
   // Manual reconnect function
   const reconnect = useCallback(() => {
     disconnect();
     setTimeout(connect, 100);
   }, [disconnect, connect]);
+
+  // Manual refetch function (e.g., for refresh button)
+  const refetch = useCallback(async () => {
+    initialFetchDoneRef.current = false;
+    await fetchInitialData();
+  }, [fetchInitialData]);
 
   return {
     status,
@@ -165,8 +207,10 @@ export function useSse() {
     connect,
     disconnect,
     reconnect,
+    refetch,
     isConnected: status === SSE_STATUS.CONNECTED,
-    isConnecting: status === SSE_STATUS.CONNECTING
+    isConnecting: status === SSE_STATUS.CONNECTING,
+    isInitialLoading
   };
 }
 

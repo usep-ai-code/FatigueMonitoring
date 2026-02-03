@@ -47,3 +47,13 @@
 .sse-disconnected {
   animation: pulse-red 1.5s infinite;
 }
+
+/* Loading spinner animation */
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 1.5s linear infinite;
+}

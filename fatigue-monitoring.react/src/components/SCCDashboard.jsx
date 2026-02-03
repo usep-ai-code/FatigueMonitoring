@@ -44,7 +44,9 @@ const SCCDashboard = () => {
     data: sseData, 
     lastHeartbeat,
     reconnect: sseReconnect,
-    isConnected 
+    refetch,
+    isConnected,
+    isInitialLoading
   } = useSse();
 
   // Track previous alerts for notification detection
@@ -489,6 +491,22 @@ const SCCDashboard = () => {
   return (
     <div className={`h-screen w-screen transition-colors duration-300 font-sans ${getBodyBg()} flex flex-col overflow-hidden relative selection:bg-red-500/30`}>
       
+      {/* --- INITIAL LOADING OVERLAY --- */}
+      {isInitialLoading && !sseData && (
+        <div className={`absolute inset-0 z-[150] flex items-center justify-center ${darkMode ? 'bg-slate-900/95' : 'bg-slate-200/95'}`}>
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div className={`w-20 h-20 border-4 border-t-transparent rounded-full animate-spin ${darkMode ? 'border-blue-500' : 'border-blue-600'}`}></div>
+              <div className={`absolute inset-0 w-20 h-20 border-4 border-b-transparent rounded-full animate-spin-reverse ${darkMode ? 'border-red-500' : 'border-red-600'}`}></div>
+            </div>
+            <div className="text-center">
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>Loading Dashboard Data...</p>
+              <p className={`text-lg mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Fetching real-time fatigue monitoring data</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- NOTIFICATIONS STACK CONTAINER --- */}
       <div className="absolute top-[10vh] right-[2vw] z-[100] flex flex-col gap-4 pointer-events-none max-w-[600px] w-[30vw]">
         {notifications.map((notif) => (
