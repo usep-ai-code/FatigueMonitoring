@@ -19,8 +19,8 @@ export function useSse() {
   const heartbeatTimeoutRef = useRef(null);
   const initialFetchDoneRef = useRef(false);
   
-  const RECONNECT_DELAY = 5000; // 5 seconds
-  const HEARTBEAT_TIMEOUT = 60000; // 60 seconds - if no heartbeat received
+  const RECONNECT_DELAY = 3000; // 3 seconds
+  const HEARTBEAT_TIMEOUT = 90000; // 90 seconds - if no heartbeat received (more forgiving)
 
   /**
    * Fetch initial data immediately via REST API
@@ -71,16 +71,32 @@ export function useSse() {
     setStatus(SSE_STATUS.DISCONNECTED);
   }, [clearTimeouts]);
 
+  // Forward declaration for connect - will be set after connect is defined
+  const connectRef = useRef(null);
+
   const resetHeartbeatTimer = useCallback(() => {
     if (heartbeatTimeoutRef.current) {
       clearTimeout(heartbeatTimeoutRef.current);
     }
     heartbeatTimeoutRef.current = setTimeout(() => {
-      console.warn('Heartbeat timeout - connection may be stale');
-      // Connection might be stale, try to reconnect
-      disconnect();
+      console.warn('Heartbeat timeout - connection may be stale, reconnecting...');
+      // Connection might be stale, disconnect and reconnect
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      clearTimeouts();
+      setStatus(SSE_STATUS.DISCONNECTED);
+      
+      // Schedule reconnection using the ref
+      reconnectTimeoutRef.current = setTimeout(() => {
+        console.log('Reconnecting after heartbeat timeout...');
+        if (connectRef.current) {
+          connectRef.current();
+        }
+      }, RECONNECT_DELAY);
     }, HEARTBEAT_TIMEOUT);
-  }, [disconnect]);
+  }, [clearTimeouts]);
 
   const connect = useCallback(() => {
     // Don't connect if already connecting or connected
@@ -172,6 +188,11 @@ export function useSse() {
       }, RECONNECT_DELAY);
     }
   }, [resetHeartbeatTimer, clearTimeouts]);
+
+  // Set the connect ref so resetHeartbeatTimer can use it
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // Fetch initial data and connect to SSE on mount
   useEffect(() => {
