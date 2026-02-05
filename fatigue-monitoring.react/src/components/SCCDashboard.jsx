@@ -11,8 +11,6 @@ import {
   Sun,
   Radio,
   Users,
-  Wifi,
-  WifiOff,
   MapPin,
   ShieldAlert,
   Bell,
@@ -23,11 +21,9 @@ import {
   EyeOff,
   Filter,
   ChevronLeft,
-  ChevronRight,
-  RefreshCw
+  ChevronRight
 } from 'lucide-react';
 import { useSse } from '../hooks/useSse';
-import { SseStatusIndicator } from './SseStatusIndicator';
 
 const SCCDashboard = () => {
   const [darkMode, setDarkMode] = useState(true);
@@ -40,12 +36,7 @@ const SCCDashboard = () => {
 
   // SSE Hook for real-time data
   const { 
-    status: sseStatus, 
     data: sseData, 
-    lastHeartbeat,
-    reconnect: sseReconnect,
-    refetch,
-    isConnected,
     isInitialLoading
   } = useSse();
 
@@ -447,21 +438,6 @@ const SCCDashboard = () => {
     return sseData.highRiskAreas.filter(h => h.area === selectedArea);
   }, [sseData?.highRiskAreas, selectedArea]);
 
-  // Sensor Health - based on follow up status
-  const sensorHealth = useMemo(() => {
-    const total = stats.totalToday || 0;
-    const followedUp = stats.followedUpToday || 0;
-    const waitingFollowUp = stats.activeOpen || 0;
-    const coverage = total > 0 ? Math.round((followedUp / total) * 100) : 0;
-    
-    return {
-      total,
-      followedUp,
-      waitingFollowUp,
-      coverage
-    };
-  }, [stats]);
-
   const handleAreaTabClick = (area) => {
     setSelectedArea(area);
     setSelectedLocationFilter(null);
@@ -681,28 +657,6 @@ const SCCDashboard = () => {
         </div>
 
         <div className="flex items-center gap-[2vw]">
-          {/* SSE Connection Status Indicator */}
-          <SseStatusIndicator 
-            status={sseStatus}
-            lastHeartbeat={lastHeartbeat}
-            onReconnect={sseReconnect}
-            darkMode={darkMode}
-            showText={true}
-          />
-
-          {/* Sensor Health */}
-          <div className={`hidden md:flex items-center gap-6 px-[1.5vw] py-[1vh] rounded-full border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300 shadow-sm'}`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${sensorHealth.coverage >= 80 ? 'bg-emerald-500' : sensorHealth.coverage >= 50 ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse'}`}></div>
-              <span className={`text-[clamp(1rem,1.2vh,1.5rem)] font-semibold whitespace-nowrap ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Sensor Health: {sensorHealth.coverage}%</span>
-            </div>
-            <div className="h-6 w-px bg-slate-600/30"></div>
-            <div className="flex items-center gap-4 text-[clamp(1rem,1.2vh,1.5rem)]">
-              <div className="flex items-center gap-2" title="Total Followed Up"><Wifi className="w-[2.5vh] h-[2.5vh] text-emerald-500" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{sensorHealth.followedUp}</span></div>
-              <div className="flex items-center gap-2" title="Total Waiting Follow Up"><WifiOff className="w-[2.5vh] h-[2.5vh] text-red-500 ml-1" /> <span className={`font-mono font-bold ${darkMode ? 'text-white' : ''}`}>{sensorHealth.waitingFollowUp}</span></div>
-            </div>
-          </div>
-
           <div className={`flex flex-col items-end ${darkMode ? 'text-white' : 'text-slate-600'}`}>
             <span className="text-[clamp(1.8rem,3vh,3.5rem)] font-mono font-bold leading-none">
               {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
