@@ -376,58 +376,15 @@ const SCCDashboard = () => {
       });
   }, [sseData?.activeAlerts, selectedArea, selectedLocationFilter]);
 
+  // PRESENTATION MODE: DELAYED FOLLOW UP set to empty
   const overdueAlerts = useMemo(() => {
-    if (!sseData?.delayedFollowUps) return [];
-    
-    // Calculate dynamic delay based on current WIB time
-    const alertsWithDynamicDelay = sseData.delayedFollowUps.map(alert => {
-      const dynamicDelay = (() => {
-        if (!alert.eventTime) return alert.delayMinutes || 0;
-        try {
-          let eventDate;
-          const eventTimeStr = alert.eventTime;
-          
-          if (typeof eventTimeStr === 'string') {
-            const cleanStr = eventTimeStr.replace('Z', '').replace('T', ' ');
-            const parts = cleanStr.split(/[-: ]/);
-            if (parts.length >= 6) {
-              eventDate = new Date(
-                parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
-                parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5])
-              );
-            } else {
-              eventDate = new Date(eventTimeStr);
-            }
-          } else {
-            eventDate = new Date(eventTimeStr);
-          }
-          
-          if (isNaN(eventDate.getTime())) return alert.delayMinutes || 0;
-          
-          const diffMs = currentTime.getTime() - eventDate.getTime();
-          return Math.max(0, Math.floor(diffMs / (1000 * 60)));
-        } catch {
-          return alert.delayMinutes || 0;
-        }
-      })();
-      
-      return { ...alert, dynamicDelayMinutes: dynamicDelay };
-    });
-    
-    if (selectedArea === 'All') {
-      return alertsWithDynamicDelay;
-    }
-    return alertsWithDynamicDelay.filter(a => a.area === selectedArea);
-  }, [sseData?.delayedFollowUps, selectedArea, currentTime]);
+    return []; // Hardcoded empty for presentation
+  }, []);
 
+  // PRESENTATION MODE: RECURRENT UNITS set to empty
   const highRiskOperators = useMemo(() => {
-    if (!sseData?.recurrentUnits) return [];
-    
-    if (selectedArea === 'All') {
-      return sseData.recurrentUnits;
-    }
-    return sseData.recurrentUnits.filter(r => r.primaryArea === selectedArea);
-  }, [sseData?.recurrentUnits, selectedArea]);
+    return []; // Hardcoded empty for presentation
+  }, []);
 
   const highFreqZones = useMemo(() => {
     if (!sseData?.highRiskAreas) return [];
