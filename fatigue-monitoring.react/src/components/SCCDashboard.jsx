@@ -198,9 +198,14 @@ const SCCDashboard = () => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
+  // PRESENTATION MODE: Notifications disabled
   // Detect new alerts and show notifications (staggered)
   // Skip notifications on initial load - only show for NEW alerts after app is running
   useEffect(() => {
+    // PRESENTATION MODE: Disable all notifications
+    return;
+    
+    /* ORIGINAL CODE - UNCOMMENT WHEN READY
     if (sseData?.activeAlerts) {
       // On initial load, just store the alerts without showing notifications
       if (isInitialLoadRef.current) {
@@ -228,6 +233,7 @@ const SCCDashboard = () => {
       
       prevAlertsRef.current = sseData.activeAlerts;
     }
+    */
   }, [sseData?.activeAlerts, addNotification]);
 
   // Clock update - WIB (GMT+7) - Server time
