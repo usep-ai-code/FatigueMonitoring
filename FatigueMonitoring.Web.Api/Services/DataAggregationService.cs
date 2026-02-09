@@ -434,6 +434,9 @@ public class DataAggregationService(
         return DateTime.UtcNow;
     }
 
+    // PRESENTATION MODE: Maximum waiting follow up items
+    private const int MaxWaitingFollowUp = 3;
+
     public async Task CalculateAggregationsAsync(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Starting aggregation calculation");
@@ -447,6 +450,14 @@ public class DataAggregationService(
 
         // Get all events for today
         var todayEvents = await dbContext.FatigueEvents
+            .Where(e => e.EventTime >= todayStart)
+            .ToListAsync(cancellationToken);
+
+        // PRESENTATION MODE: Limit waiting follow up to max 3 items
+        await LimitWaitingFollowUpAsync(dbContext, todayEvents, cancellationToken);
+
+        // Refresh events after potential updates
+        todayEvents = await dbContext.FatigueEvents
             .Where(e => e.EventTime >= todayStart)
             .ToListAsync(cancellationToken);
 
@@ -470,6 +481,46 @@ public class DataAggregationService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Aggregation calculation completed. Processed {Count} events for today.", todayEvents.Count);
+    }
+
+    /// <summary>
+    /// PRESENTATION MODE: Limits waiting follow up to maximum 3 items.
+    /// Older items are auto-updated to IsFollowedUp=true
+    /// </summary>
+    private async Task LimitWaitingFollowUpAsync(
+        FatigueMonitoringDbContext dbContext,
+        List<AI_FatigueEvent_T> todayEvents,
+        CancellationToken cancellationToken)
+    {
+        var waitingFollowUp = todayEvents
+            .Where(e => !e.IsFollowedUp)
+            .OrderByDescending(e => e.EventTime) // Newest first
+            .ToList();
+
+        if (waitingFollowUp.Count <= MaxWaitingFollowUp)
+        {
+            return; // No action needed
+        }
+
+        // Keep only the 3 newest, mark the rest as followed up
+        var toMarkAsFollowedUp = waitingFollowUp.Skip(MaxWaitingFollowUp).ToList();
+
+        logger.LogInformation("PRESENTATION MODE: Marking {Count} older alerts as followed up to keep max {Max} waiting",
+            toMarkAsFollowedUp.Count, MaxWaitingFollowUp);
+
+        foreach (var evt in toMarkAsFollowedUp)
+        {
+            // Update the entity in the database
+            var dbEvent = await dbContext.FatigueEvents.FindAsync([evt.Id], cancellationToken);
+            if (dbEvent != null)
+            {
+                dbEvent.IsFollowedUp = true;
+                dbEvent.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("PRESENTATION MODE: Successfully marked {Count} alerts as followed up", toMarkAsFollowedUp.Count);
     }
 
     private async Task CalculateDashboardSummaryAsync(
