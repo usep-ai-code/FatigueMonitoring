@@ -386,14 +386,10 @@ const SCCDashboard = () => {
     return []; // Hardcoded empty for presentation
   }, []);
 
+  // PRESENTATION MODE: HIGH RISK AREA set to empty
   const highFreqZones = useMemo(() => {
-    if (!sseData?.highRiskAreas) return [];
-    
-    if (selectedArea === 'All') {
-      return sseData.highRiskAreas;
-    }
-    return sseData.highRiskAreas.filter(h => h.area === selectedArea);
-  }, [sseData?.highRiskAreas, selectedArea]);
+    return []; // Hardcoded empty for presentation
+  }, []);
 
   const handleAreaTabClick = (area) => {
     setSelectedArea(area);
